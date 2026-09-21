@@ -21,13 +21,13 @@ if (isset($_SESSION['admin_verified_time']) && (time() - $_SESSION['admin_verifi
 include '../includes/db.php';
 include '../includes/header.php';
 
-$result = $conn->query("SELECT * FROM user");
+$result = $conn->query("SELECT * FROM employees");
 
 // Count different user types for dashboard cards
-$total_users = $conn->query("SELECT COUNT(*) as count FROM user")->fetch_assoc()['count'];
-$admin_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type = 'Admin'")->fetch_assoc()['count'];
-$regular_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type = 'User'")->fetch_assoc()['count'];
-$active_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type IN ('Admin', 'User')")->fetch_assoc()['count'];
+$total_users = $conn->query("SELECT COUNT(*) as count FROM employees")->fetch_assoc()['count'];
+$admin_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type = 'Admin'")->fetch_assoc()['count'];
+$regular_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type = 'User'")->fetch_assoc()['count'];
+$active_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type IN ('Admin', 'User')")->fetch_assoc()['count'];
 
 // Display session messages
 if (isset($_SESSION['message'])) {
