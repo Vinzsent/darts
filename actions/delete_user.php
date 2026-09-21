@@ -5,7 +5,7 @@ session_start();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = intval($_POST['id'] ?? 0);
     if ($id > 0) {
-        $stmt = $conn->prepare("DELETE FROM user WHERE id = ?");
+        $stmt = $conn->prepare("DELETE FROM employees WHERE id = ?");
         $stmt->bind_param("i", $id);
         if ($stmt->execute()) {
             $_SESSION['message'] = "User deleted successfully!";
