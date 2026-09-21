@@ -15,9 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = 'Database connection error. Please try again later.';
     error_log('Login failed because database connection was not available.');
   } else {
-    $stmt = $conn->prepare("SELECT * FROM user WHERE username = ?");
+    $stmt = $conn->prepare("SELECT * FROM employees WHERE username = ? OR email = ?");
     if ($stmt) {
-      $stmt->bind_param("s", $username);
+      $stmt->bind_param("ss", $username, $username);
       $stmt->execute();
       $result = $stmt->get_result();
 
