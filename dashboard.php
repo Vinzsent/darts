@@ -1127,8 +1127,11 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
   <div id="loginSuccessModal" class="modal-overlay">
     <div class="modal-content">
       <span class="close-btn" onclick="closeModal()">&times;</span>
-      <i class="fas fa-check-circle modal-icon"></i>
-      <h2>Welcome, <?= htmlspecialchars(explode(' ', $_SESSION['title'])[0]) ?> <?= htmlspecialchars(explode(' ', $_SESSION['name'])[0]) ?>!</h2>
+      <?php
+        $titlePrefix = !empty($_SESSION['title']) ? trim(explode(' ', trim((string)$_SESSION['title']))[0]) . ' ' : '';
+        $firstName = !empty($_SESSION['name']) ? trim(explode(' ', trim((string)$_SESSION['name']))[0]) : (!empty($_SESSION['username']) ? $_SESSION['username'] : 'User');
+      ?>
+      <h2>Welcome, <?= htmlspecialchars($titlePrefix . $firstName) ?>!</h2>
       <p class="text-center">You have successfully logged in to DCC-DARTS.</p>
       <button class="btn btn-success" onclick="closeModal()">Close</button>
     </div>
