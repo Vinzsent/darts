@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'];
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
-    $stmt = $conn->prepare("INSERT INTO user (title, first_name, middle_name, last_name, suffix, academic_title, user_type, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO employees (title, first_name, middle_name, last_name, suffix, academic_title, user_type, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("sssssssss", $title, $first_name, $middle_name, $last_name, $suffix, $academic_title, $user_type, $email, $password);
     $stmt->execute();
 
