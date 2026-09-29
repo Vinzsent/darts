@@ -17,10 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($password)) {
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $conn->prepare("UPDATE user SET title=?, first_name=?, middle_name=?, last_name=?, suffix=?, academic_title=?, user_type=?, department=?, username=?, password=? WHERE id=?");
+        $stmt = $conn->prepare("UPDATE employees SET title=?, first_name=?, middle_name=?, last_name=?, suffix=?, academic_title=?, user_type=?, department=?, username=?, password=? WHERE id=?");
         $stmt->bind_param("ssssssssssi", $title, $first_name, $middle_name, $last_name, $suffix, $academic_title, $user_type, $department, $username, $hashed_password, $id);
     } else {
-        $stmt = $conn->prepare("UPDATE user SET title=?, first_name=?, middle_name=?, last_name=?, suffix=?, academic_title=?, user_type=?, department=?, username=? WHERE id=?");
+        $stmt = $conn->prepare("UPDATE employees SET title=?, first_name=?, middle_name=?, last_name=?, suffix=?, academic_title=?, user_type=?, department=?, username=? WHERE id=?");
         $stmt->bind_param("sssssssssi", $title, $first_name, $middle_name, $last_name, $suffix, $academic_title, $user_type, $department, $username, $id);
     }
 
