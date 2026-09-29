@@ -11,6 +11,24 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $po_id = intval($_GET['id']);
 
 try {
+    // Detect user table name columns
+    $user_cols = [];
+    $u_res = $conn->query("SHOW COLUMNS FROM `user`");
+    while ($u_res && $c = $u_res->fetch_assoc()) {
+        $user_cols[] = $c['Field'];
+    }
+
+    if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
+        $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '')";
+    } elseif (in_array('firstname', $user_cols, true) && in_array('lastname', $user_cols, true)) {
+        $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.firstname, u.lastname)), '')";
+    } elseif (in_array('name', $user_cols, true)) {
+        $user_name_expr = "NULLIF(TRIM(u.name), '')";
+    } else {
+        $user_name_expr = "NULLIF(TRIM(u.username), '')";
+    }
+    $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
+
     // Get purchase order details
     $po_query = "
         SELECT 
@@ -26,11 +44,12 @@ try {
             p.total_amount,
             p.status,
             p.notes,
+            p.received_notes,
             p.created_at,
             p.updated_at,
-            CONCAT(u.first_name, ' ', u.last_name) as created_by_name
+            $created_by_expr as created_by_name
         FROM purchase_orders p
-        LEFT JOIN user u ON p.created_by = u.id
+        LEFT JOIN `user` u ON p.created_by = u.id
         WHERE p.po_id = ?
     ";
     
@@ -46,6 +65,14 @@ try {
     
     $purchase_order = $po_result->fetch_assoc();
     
+    // Check available columns in purchase_order_items
+    $poi_cols = [];
+    $poi_res = $conn->query("SHOW COLUMNS FROM purchase_order_items");
+    while ($poi_res && $col = $poi_res->fetch_assoc()) {
+        $poi_cols[] = $col['Field'];
+    }
+    $poi_recv_col = in_array('received_date', $poi_cols, true) ? 'received_date' : (in_array('date_received', $poi_cols, true) ? 'date_received AS received_date' : 'NULL AS received_date');
+
     // Get purchase order items
     $items_query = "
         SELECT 
@@ -54,7 +81,9 @@ try {
             item_description,
             quantity,
             unit_cost,
-            line_total
+            line_total,
+            is_received,
+            $poi_recv_col
         FROM purchase_order_items
         WHERE po_id = ?
         ORDER BY item_number ASC
