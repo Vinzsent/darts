@@ -15,7 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = 'Database connection error. Please try again later.';
     error_log('Login failed because database connection was not available.');
   } else {
-    $stmt = $conn->prepare("SELECT * FROM employees WHERE username = ? OR email = ?");
+    // Accounts live in the `user` table (username + password).
+    // The legacy `employees` table is an identical mirror and is no longer used here.
+    $stmt = $conn->prepare("SELECT * FROM `user` WHERE username = ? OR email = ? LIMIT 1");
     if ($stmt) {
       $stmt->bind_param("ss", $username, $username);
       $stmt->execute();
