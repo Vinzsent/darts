@@ -17,7 +17,7 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $search_param = "%$search%";
 
 // Count filtered users for pagination
-$count_query = "SELECT COUNT(*) as count FROM user WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?)";
+$count_query = "SELECT COUNT(*) as count FROM employees WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?)";
 $stmt_count = $conn->prepare($count_query);
 $stmt_count->bind_param("sss", $search_param, $search_param, $search_param);
 $stmt_count->execute();
@@ -27,7 +27,7 @@ $total_pages = max(1, (int) ceil($filtered_users / $records_per_page));
 if ($page > $total_pages) $page = $total_pages;
 $offset = ($page - 1) * $records_per_page;
 
-$stmt = $conn->prepare("SELECT * FROM user WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?) ORDER BY last_name, first_name LIMIT ?, ?");
+$stmt = $conn->prepare("SELECT * FROM employees WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?) ORDER BY last_name, first_name LIMIT ?, ?");
 $stmt->bind_param("sssii", $search_param, $search_param, $search_param, $offset, $records_per_page);
 $stmt->execute();
 $result = $stmt->get_result();
