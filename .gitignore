@@ -1,0 +1,19 @@
+# ── Stray editor / tooling artifacts ──
+# Captured pager output from a mangled command line (e.g. a truncated "...16-x64\php.exe").
+# These are accidents, never part of the app.
+*EOL
+*.updated
+*.tmp
+*.log
+*.bak
+*.orig
+
+# ── Local environment / secrets ──
+.env
+.env.local
+*.local.php
+
+# ── OS noise ──
+.DS_Store
+Thumbs.db
+desktop.ini
