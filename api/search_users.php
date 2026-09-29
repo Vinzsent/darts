@@ -17,13 +17,13 @@ $search_param = "%$search%";
 
 // Count total records
 if ($search) {
-    $count_sql = "SELECT COUNT(*) as count FROM user WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?";
+    $count_sql = "SELECT COUNT(*) as count FROM employees WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?";
     $stmt = $conn->prepare($count_sql);
     $stmt->bind_param("sss", $search_param, $search_param, $search_param);
     $stmt->execute();
     $total_records = $stmt->get_result()->fetch_assoc()['count'];
 } else {
-    $total_records = $conn->query("SELECT COUNT(*) as count FROM user")->fetch_assoc()['count'];
+    $total_records = $conn->query("SELECT COUNT(*) as count FROM employees")->fetch_assoc()['count'];
 }
 
 $total_pages = max(1, (int) ceil($total_records / $records_per_page));
@@ -32,11 +32,11 @@ $offset = ($page - 1) * $records_per_page;
 
 // Fetch users
 if ($search) {
-    $sql = "SELECT * FROM user WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? ORDER BY last_name, first_name LIMIT ?, ?";
+    $sql = "SELECT * FROM employees WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? ORDER BY last_name, first_name LIMIT ?, ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("sssii", $search_param, $search_param, $search_param, $offset, $records_per_page);
 } else {
-    $sql = "SELECT * FROM user ORDER BY last_name, first_name LIMIT ?, ?";
+    $sql = "SELECT * FROM employees ORDER BY last_name, first_name LIMIT ?, ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("ii", $offset, $records_per_page);
 }
