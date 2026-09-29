@@ -1,6 +1,8 @@
 <?php
 $pageTitle = 'DARTS';
 include 'includes/auth.php';
+// db.php provides $conn — required by the profile card query further down.
+include 'includes/db.php';
 include 'includes/header.php';
 
 // Get user type from session and normalize it (remove spaces and hyphens, convert to lowercase)
@@ -167,6 +169,50 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
 
   .card-danger .card-icon {
     background: linear-gradient(135deg, #dc3545, #e83e8c);
+  }
+
+  /* Profile card — gold gradient accent */
+  .card-profile {
+    background: linear-gradient(135deg, rgba(255, 255, 255, .97) 0%, rgba(255, 251, 230, .97) 100%);
+    border: 1px solid rgba(234, 202, 38, .25);
+  }
+
+  .card-profile .card-icon {
+    background: linear-gradient(135deg, #EACA26, #f5a623);
+    color: #073b1d;
+    box-shadow: 0 4px 14px rgba(234, 202, 38, .45);
+    position: relative;
+  }
+
+  .card-profile::before {
+    background: linear-gradient(90deg, #EACA26, #f5a623) !important;
+  }
+
+  .card-profile .card-button {
+    background: linear-gradient(135deg, #073b1d, #0a4f28);
+    color: #EACA26;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+
+  .card-profile .card-button:hover {
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(7, 59, 29, .4);
+  }
+
+  /* Profile info pills inside the card */
+  .profile-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: rgba(7, 59, 29, .07);
+    border: 1px solid rgba(7, 59, 29, .12);
+    color: #073b1d;
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .25rem .7rem;
+    border-radius: 100px;
+    margin: .2rem .15rem 0;
   }
 
   /* Modal Styles */
@@ -1120,6 +1166,40 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         <button onclick="showPasswordModal()" class="card-button">Access Settings</button>
       </div>
     <?php endif; ?>
+
+    <!-- My Profile Card — visible to ALL users -->
+    <?php
+    $db_user_id = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
+    $profile_row = null;
+    if ($db_user_id) {
+      $p_stmt = $conn->prepare('SELECT first_name, last_name, title, user_type FROM user WHERE id = ? LIMIT 1');
+      $p_stmt->bind_param('i', $db_user_id);
+      $p_stmt->execute();
+      $profile_row = $p_stmt->get_result()->fetch_assoc();
+      $p_stmt->close();
+    }
+    $display_name = $profile_row
+      ? trim(($profile_row['title'] ? $profile_row['title'] . ' ' : '') . $profile_row['first_name'] . ' ' . $profile_row['last_name'])
+      : ($_SESSION['name'] ?? $_SESSION['user']['name'] ?? 'User');
+    $display_role = $profile_row['user_type'] ?? ($raw_user_type ?: 'User');
+    $display_dept = ''; // department column removed
+    ?>
+    <div class="menu-card card-profile">
+      <div class="card-icon" style="font-size:1.6rem; color:#073b1d;">
+        <i class="fas fa-user-circle"></i>
+      </div>
+      <h3 class="card-title" style="font-size:1.05rem;"><?= htmlspecialchars($display_name) ?></h3>
+      <div style="margin-bottom:.9rem; line-height:1.8;">
+        <?php if ($display_role): ?>
+          <span class="profile-pill"><i class="fas fa-id-badge"></i><?= htmlspecialchars($display_role) ?></span>
+        <?php endif; ?>
+        <?php if ($display_dept): ?>
+          <span class="profile-pill"><i class="fas fa-building"></i><?= htmlspecialchars($display_dept) ?></span>
+        <?php endif; ?>
+      </div>
+      <p class="card-description">Update your personal information, change your username, and manage your account password.</p>
+      <a href="pages/profile.php" class="card-button"><i class="fas fa-user-edit me-1"></i>Edit Profile</a>
+    </div>
   </div>
 </div>
 
@@ -1128,8 +1208,8 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     <div class="modal-content">
       <span class="close-btn" onclick="closeModal()">&times;</span>
       <?php
-        $titlePrefix = !empty($_SESSION['title']) ? trim(explode(' ', trim((string)$_SESSION['title']))[0]) . ' ' : '';
-        $firstName = !empty($_SESSION['name']) ? trim(explode(' ', trim((string)$_SESSION['name']))[0]) : (!empty($_SESSION['username']) ? $_SESSION['username'] : 'User');
+      $titlePrefix = !empty($_SESSION['title']) ? trim(explode(' ', trim((string)$_SESSION['title']))[0]) . ' ' : '';
+      $firstName = !empty($_SESSION['name']) ? trim(explode(' ', trim((string)$_SESSION['name']))[0]) : (!empty($_SESSION['username']) ? $_SESSION['username'] : 'User');
       ?>
       <h2>Welcome, <?= htmlspecialchars($titlePrefix . $firstName) ?>!</h2>
       <p class="text-center">You have successfully logged in to DCC-DARTS.</p>
