@@ -70,11 +70,11 @@ $offices = [
 // Sort alphabetically
 sort($offices);
 
-// Fetch unique employee counts per office directly from user table
+// Fetch unique employee counts per office directly from employees table
 $employeeCounts = [];
 $countQuery = "
     SELECT department, COUNT(*) as total 
-    FROM user 
+    FROM employees 
     WHERE department IS NOT NULL AND department != '' 
     GROUP BY department
 ";

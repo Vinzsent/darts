@@ -27,13 +27,13 @@ if (empty($office)) {
     exit;
 }
 
-// Fetch all users associated with this department/office directly from user table
+// Fetch all users associated with this department/office directly from employees table
 $employees = [];
 $user_ids = [];
 
 $user_query = "
     SELECT id, first_name, last_name, user_type, username, email 
-    FROM user 
+    FROM employees 
     WHERE department = ?
 ";
 $stmt = $conn->prepare($user_query);

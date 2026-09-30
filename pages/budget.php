@@ -35,14 +35,14 @@ if (strpos(strtolower($user_type), 'immediate head') !== false) {
             $user_course = strtolower(trim(end($user_type_parts)));
         }
     } else {
-        // For plain "Immediate Head", get course_id from users table
-        $user_query = "SELECT course_id FROM users WHERE id = ?";
+        // For plain "Immediate Head", get course from employees table
+        $user_query = "SELECT course FROM employees WHERE id = ?";
         $stmt = mysqli_prepare($conn, $user_query);
         mysqli_stmt_bind_param($stmt, "i", $user_id);
         mysqli_stmt_execute($stmt);
         $result = mysqli_stmt_get_result($stmt);
         if ($row = mysqli_fetch_assoc($result)) {
-            $user_course_id = strtolower($row['course_id']);
+            $user_course_id = strtolower($row['course'] ?? '');
             // Now fetch course_name from courses table using course_id
             $course_name_query = "SELECT course_name FROM courses WHERE course_id = ?";
             $stmt_course = mysqli_prepare($conn, $course_name_query);

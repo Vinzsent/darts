@@ -31,7 +31,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
 $user_type = $_SESSION['user_type'] ?? '';
 $dashboard_link = ($user_type == 'Admin') ? '../dashboard.php' : '../dashboard.php';
 
-$records_per_page = 5;
+$records_per_page = 10;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) {
     $page = 1;
@@ -43,14 +43,14 @@ $search_param = "%$search%";
 
 // Count different user types for dashboard cards (Keep these as total counts)
 // These queries are fast enough to run on every page load for now, or could be optimized
-$total_users_count = $conn->query("SELECT COUNT(*) as count FROM user")->fetch_assoc()['count'];
-$admin_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type = 'Admin'")->fetch_assoc()['count'];
-$regular_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type = 'User'")->fetch_assoc()['count'];
-$active_users = $conn->query("SELECT COUNT(*) as count FROM user WHERE user_type IN ('Admin', 'User')")->fetch_assoc()['count'];
+$total_users_count = $conn->query("SELECT COUNT(*) as count FROM employees")->fetch_assoc()['count'];
+$admin_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type = 'Admin'")->fetch_assoc()['count'];
+$regular_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type = 'User'")->fetch_assoc()['count'];
+$active_users = $conn->query("SELECT COUNT(*) as count FROM employees WHERE user_type IN ('Admin', 'User')")->fetch_assoc()['count'];
 
 // Count for pagination (Filtered)
 if (!empty($search)) {
-    $count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM user WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? OR department LIKE ?");
+    $count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM employees WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? OR department LIKE ?");
     $count_stmt->bind_param("ssss", $search_param, $search_param, $search_param, $search_param);
     $count_stmt->execute();
     $total_filtered = $count_stmt->get_result()->fetch_assoc()['count'];
@@ -65,10 +65,10 @@ if ($page > $total_pages) {
 $offset = ($page - 1) * $records_per_page;
 
 if (!empty($search)) {
-    $stmt = $conn->prepare("SELECT * FROM user WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? OR department LIKE ? ORDER BY last_name, first_name LIMIT ?, ?");
+    $stmt = $conn->prepare("SELECT * FROM employees WHERE first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ? OR department LIKE ? ORDER BY last_name, first_name LIMIT ?, ?");
     $stmt->bind_param("ssssii", $search_param, $search_param, $search_param, $search_param, $offset, $records_per_page);
 } else {
-    $stmt = $conn->prepare("SELECT * FROM user ORDER BY last_name, first_name LIMIT ?, ?");
+    $stmt = $conn->prepare("SELECT * FROM employees ORDER BY last_name, first_name LIMIT ?, ?");
     $stmt->bind_param("ii", $offset, $records_per_page);
 }
 $stmt->execute();
@@ -85,18 +85,18 @@ while ($row = $result->fetch_assoc()):
                     <i class="fas fa-user-circle fa-2x text-muted"></i>
                 </div>
                 <div>
-                    <div class="fw-bold"><?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?></div>
+                    <div class="fw-bold"><?= htmlspecialchars(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')) ?></div>
                     <small class="text-muted">ID: <?= $row['id'] ?></small>
                 </div>
             </div>
         </td>
         <td>
-            <span class="badge <?= $row['user_type'] === 'Admin' ? 'bg-success' : 'bg-primary' ?>">
-                <?= htmlspecialchars(strtoupper($row['user_type'])) ?>
+            <span class="badge <?= ($row['user_type'] ?? '') === 'Admin' ? 'bg-success' : 'bg-primary' ?>">
+                <?= htmlspecialchars(strtoupper($row['user_type'] ?? '')) ?>
             </span>
         </td>
         <td><?= htmlspecialchars($row['department'] ?? 'N/A') ?></td>
-        <td><?= htmlspecialchars($row['username']) ?></td>
+        <td><?= htmlspecialchars($row['username'] ?? '') ?></td>
         <td class="text-center">
             <div class="dropdown">
                 <button class="btn btn-link btn-ellipsis" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -105,15 +105,15 @@ while ($row = $result->fetch_assoc()):
                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
                     <li>
                         <a class="dropdown-item py-2" href="#" onclick="openEditModal(
-                                            <?= $row['id'] ?>,
+                                            <?= (int)$row['id'] ?>,
                                             '<?= addslashes($row['title'] ?? '') ?>',
-                                            '<?= addslashes($row['first_name']) ?>',
+                                            '<?= addslashes($row['first_name'] ?? '') ?>',
                                             '<?= addslashes($row['middle_name'] ?? '') ?>',
-                                            '<?= addslashes($row['last_name']) ?>',
+                                            '<?= addslashes($row['last_name'] ?? '') ?>',
                                             '<?= addslashes($row['suffix'] ?? '') ?>',
                                             '<?= addslashes($row['academic_title'] ?? '') ?>',
-                                            '<?= addslashes($row['user_type']) ?>',
-                                            '<?= addslashes($row['username']) ?>',
+                                            '<?= addslashes($row['user_type'] ?? '') ?>',
+                                            '<?= addslashes($row['username'] ?? '') ?>',
                                             '<?= addslashes($row['department'] ?? '') ?>'
                                           ); return false;">
                             <i class="fas fa-edit me-2 text-warning"></i>Edit
@@ -121,7 +121,7 @@ while ($row = $result->fetch_assoc()):
                     </li>
                     <li>
                         <a class="dropdown-item py-2 text-danger" href="#" onclick="openDeleteModal(
-                                            <?= $row['id'] ?>
+                                            <?= (int)$row['id'] ?>
                                           ); return false;">
                             <i class="fas fa-trash me-2"></i>Delete
                         </a>
@@ -136,21 +136,49 @@ $table_rows = ob_get_clean();
 
 // Prepare Pagination HTML
 ob_start();
-if ($total_pages > 0):
+if ($total_filtered > 0):
 ?>
-    <ul class="pagination justify-content-center mb-0">
-        <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
-            <a class="page-link" href="#" onclick="loadUsers(<?= max(1, $page - 1) ?>); return false;">Previous</a>
-        </li>
-        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-            <li class="page-item <?= $page == $i ? 'active' : '' ?>">
-                <a class="page-link" href="#" onclick="loadUsers(<?= $i ?>); return false;"><?= $i ?></a>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="text-muted small">
+            Showing <?= ($total_filtered > 0) ? $offset + 1 : 0 ?> to <?= min($offset + $records_per_page, $total_filtered) ?> of <?= $total_filtered ?> entries
+        </div>
+        <?php if ($total_pages > 1): ?>
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                <a class="page-link" href="#" onclick="loadUsers(<?= max(1, $page - 1) ?>); return false;">Previous</a>
             </li>
-        <?php endfor; ?>
-        <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
-            <a class="page-link" href="#" onclick="loadUsers(<?= min($total_pages, $page + 1) ?>); return false;">Next</a>
-        </li>
-    </ul>
+            <?php
+            $start_page = max(1, $page - 2);
+            $end_page = min($total_pages, $page + 2);
+
+            if ($start_page > 1) {
+                echo '<li class="page-item ' . ($page == 1 ? 'active' : 'd-none d-sm-inline-block') . '">';
+                echo '<a class="page-link" href="#" onclick="loadUsers(1); return false;">1</a></li>';
+                if ($start_page > 2) {
+                    echo '<li class="page-item disabled d-none d-sm-inline-block"><span class="page-link">&hellip;</span></li>';
+                }
+            }
+
+            for ($i = $start_page; $i <= $end_page; $i++): ?>
+                <li class="page-item <?= $page == $i ? 'active' : 'd-none d-sm-inline-block' ?>">
+                    <a class="page-link" href="#" onclick="loadUsers(<?= $i ?>); return false;"><?= $i ?></a>
+                </li>
+            <?php endfor;
+
+            if ($end_page < $total_pages) {
+                if ($end_page < $total_pages - 1) {
+                    echo '<li class="page-item disabled d-none d-sm-inline-block"><span class="page-link">&hellip;</span></li>';
+                }
+                echo '<li class="page-item ' . ($page == $total_pages ? 'active' : 'd-none d-sm-inline-block') . '">';
+                echo '<a class="page-link" href="#" onclick="loadUsers(' . $total_pages . '); return false;">' . $total_pages . '</a></li>';
+            }
+            ?>
+            <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
+                <a class="page-link" href="#" onclick="loadUsers(<?= min($total_pages, $page + 1) ?>); return false;">Next</a>
+            </li>
+        </ul>
+        <?php endif; ?>
+    </div>
 <?php
 endif;
 $pagination_html = ob_get_clean();

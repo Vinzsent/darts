@@ -143,7 +143,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
     u.first_name,
     u.last_name
 FROM supply_request sr
-JOIN user u ON sr.user_id = u.id;
+JOIN employees u ON sr.user_id = u.id;
 ";
 $approved_requests_result = $conn->query($approved_requests_sql);*/
 
@@ -1286,7 +1286,7 @@ if (isset($_SESSION['error'])) {
                     sr.noted_date, sr.checked_date, sr.verified_date, sr.issued_date, sr.approved_date,
                     CONCAT_WS(' ', u.first_name, u.last_name) AS requester_name
                 FROM supply_request sr 
-                LEFT JOIN user u ON u.id = sr.user_id
+                LEFT JOIN employees u ON u.id = sr.user_id
                 $whereClause
                 ORDER BY sr.date_requested DESC";
                     $request_result = $conn->query($request_sql);

@@ -76,6 +76,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             <span class="font-medium">Canvass Form List</span>
         </a>
 
+        <!-- Purchase Order List (supply in-charge receives items into supply stock) -->
+        <a href="purchase_order_list.php"
+            class="flex items-center px-4 py-3 rounded-xl transition-all duration-200 group <?= ($current_page == 'purchase_order_list.php') ? 'bg-yellow-400 text-[#073b1d] shadow-lg' : 'hover:bg-white/10' ?>">
+            <i class="fas fa-clipboard-check w-6 <?= ($current_page == 'purchase_order_list.php') ? 'text-[#073b1d]' : 'text-white/70 group-hover:text-white' ?>"></i>
+            <span class="font-medium">Purchase Order List</span>
+        </a>
+
         <div class="pt-4 pb-2 px-4">
             <p class="text-[10px] text-white/40 uppercase font-semibold tracking-widest">System</p>
         </div>

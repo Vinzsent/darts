@@ -57,7 +57,7 @@ $sql = "SELECT sr.*,
         CONCAT_WS(' ', u.first_name, u.last_name) AS requester_name,
         u.user_type AS requester_position
         FROM supply_request sr 
-        LEFT JOIN user u ON u.id = sr.user_id
+        LEFT JOIN employees u ON u.id = sr.user_id
         $whereClause
         ORDER BY sr.date_requested DESC";
 $result = $conn->query($sql);

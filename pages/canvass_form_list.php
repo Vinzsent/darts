@@ -22,12 +22,12 @@ $offset = ($current_page_num - 1) * $items_per_page;
 
 if ($search !== '') {
     $search_param = '%' . $search . '%';
-    
+
     // Get total count for pagination with search filter (GEMINI.md optimized search query)
     $count_query = "
         SELECT COUNT(DISTINCT c.canvass_id) as total 
         FROM canvass c 
-        LEFT JOIN user u ON c.created_by = u.id
+        LEFT JOIN employees u ON c.created_by = u.id
         LEFT JOIN canvass_items ci ON c.canvass_id = ci.canvass_id
         WHERE (c.hide_canvass = '0' OR c.hide_canvass IS NULL)
           AND (
@@ -72,14 +72,14 @@ if ($search !== '') {
             c.status,
             c.notes,
             c.created_at,
-            ci.supplier_name,
-            ci.item_description,
-            ci.department,
-            ci.campus,
+            MIN(ci.supplier_name) as supplier_name,
+            MIN(ci.item_description) as item_description,
+            MIN(ci.department) as department,
+            MIN(ci.campus) as campus,
             CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
             COUNT(ci.canvass_item_id) as item_count
         FROM canvass c
-        LEFT JOIN user u ON c.created_by = u.id
+        LEFT JOIN employees u ON c.created_by = u.id
         LEFT JOIN canvass_items ci ON c.canvass_id = ci.canvass_id
         WHERE (c.hide_canvass = '0' OR c.hide_canvass IS NULL)
           AND (
@@ -95,6 +95,10 @@ if ($search !== '') {
         LIMIT ? OFFSET ?
     ";
     $stmt = $conn->prepare($canvass_query);
+    if (!$stmt) {
+        http_response_code(500);
+        die('Query prepare failed: ' . $conn->error);
+    }
     $stmt->bind_param("ssssssii", $search_param, $search_param, $search_param, $search_param, $search_param, $search_param, $items_per_page, $offset);
     $stmt->execute();
     $canvass_result = $stmt->get_result();
@@ -109,10 +113,10 @@ if ($search !== '') {
             c.status,
             c.notes,
             c.created_at,
-            ci.supplier_name,
-            ci.item_description,
-            ci.department,
-            ci.campus,
+            MIN(ci.supplier_name) as supplier_name,
+            MIN(ci.item_description) as item_description,
+            MIN(ci.department) as department,
+            MIN(ci.campus) as campus,
             CONCAT(u.first_name, ' ', u.last_name) as created_by_name,
             COUNT(ci.canvass_item_id) as item_count
         FROM canvass c
@@ -124,6 +128,10 @@ if ($search !== '') {
         LIMIT ? OFFSET ?
     ";
     $stmt = $conn->prepare($canvass_query);
+    if (!$stmt) {
+        http_response_code(500);
+        die('Query prepare failed: ' . $conn->error);
+    }
     $stmt->bind_param("ii", $items_per_page, $offset);
     $stmt->execute();
     $canvass_result = $stmt->get_result();
@@ -133,7 +141,8 @@ if ($search !== '') {
 /**
  * Helper to render canvass table rows HTML
  */
-function get_table_rows_html($canvass_result, $user_role_norm, $search = '') {
+function get_table_rows_html($canvass_result, $user_role_norm, $search = '')
+{
     ob_start();
     if ($canvass_result && $canvass_result->num_rows > 0) {
         while ($row = $canvass_result->fetch_assoc()): ?>
@@ -209,7 +218,8 @@ function get_table_rows_html($canvass_result, $user_role_norm, $search = '') {
 /**
  * Helper to render pagination controls HTML (preserves search criteria)
  */
-function get_pagination_html($current_page, $total_pages, $search = '') {
+function get_pagination_html($current_page, $total_pages, $search = '')
+{
     if ($total_pages <= 1) {
         return '';
     }
@@ -238,7 +248,7 @@ function get_pagination_html($current_page, $total_pages, $search = '') {
             </li>
         </ul>
     </nav>
-    <?php
+<?php
     return ob_get_clean();
 }
 
@@ -691,7 +701,7 @@ $campuses = ["MAIN", "BED"];
             id = currentCanvassId;
         }
         if (!id) return;
-        
+
         // Open window synchronously to avoid popup blockers
         const printWindow = window.open('', '_blank');
         if (printWindow) {
@@ -762,7 +772,7 @@ $campuses = ["MAIN", "BED"];
         if (!printWindow) {
             printWindow = window.open('', '_blank');
         }
-        
+
         if (printWindow) {
             printWindow.document.open();
             printWindow.document.write(`
@@ -869,11 +879,11 @@ $campuses = ["MAIN", "BED"];
         if (!query) return;
         const tableBody = document.getElementById('canvass-table-body');
         if (!tableBody) return;
-        
+
         // Escape special regex characters
         const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
-        
+
         function traverseAndHighlight(node) {
             if (node.nodeType === Node.TEXT_NODE) {
                 const text = node.nodeValue;
@@ -887,7 +897,7 @@ $campuses = ["MAIN", "BED"];
                 children.forEach(child => traverseAndHighlight(child));
             }
         }
-        
+
         traverseAndHighlight(tableBody);
     }
 
@@ -900,7 +910,7 @@ $campuses = ["MAIN", "BED"];
         const url = new URL(window.location.href);
         url.searchParams.set('ajax', '1');
         url.searchParams.set('page', page);
-        
+
         const searchInput = document.getElementById('table-search-input');
         const q = searchInput ? searchInput.value.trim() : '';
         if (q) {
@@ -921,69 +931,72 @@ $campuses = ["MAIN", "BED"];
         }
 
         fetch(url.toString(), {
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            if (data.success) {
-                // Update table body content dynamically
-                if (tableBody) {
-                    tableBody.innerHTML = data.rows;
-                    tableBody.style.opacity = '1';
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update table body content dynamically
+                    if (tableBody) {
+                        tableBody.innerHTML = data.rows;
+                        tableBody.style.opacity = '1';
+                    }
 
-                // Update pagination controls wrapper
-                const paginationWrapper = document.getElementById('pagination-wrapper');
-                if (paginationWrapper) {
-                    if (data.total_pages > 1) {
-                        paginationWrapper.innerHTML = `<div class="pagination-container">${data.pagination}</div>`;
+                    // Update pagination controls wrapper
+                    const paginationWrapper = document.getElementById('pagination-wrapper');
+                    if (paginationWrapper) {
+                        if (data.total_pages > 1) {
+                            paginationWrapper.innerHTML = `<div class="pagination-container">${data.pagination}</div>`;
+                        } else {
+                            paginationWrapper.innerHTML = '';
+                        }
+                    }
+
+                    // Update browser URL state without reloading (Option A)
+                    const pushUrl = new URL(window.location.href);
+                    pushUrl.searchParams.set('page', page);
+                    if (q) {
+                        pushUrl.searchParams.set('q', q);
                     } else {
-                        paginationWrapper.innerHTML = '';
+                        pushUrl.searchParams.delete('q');
                     }
-                }
+                    window.history.pushState({
+                        page: page,
+                        q: q
+                    }, '', pushUrl.toString());
 
-                // Update browser URL state without reloading (Option A)
-                const pushUrl = new URL(window.location.href);
-                pushUrl.searchParams.set('page', page);
-                if (q) {
-                    pushUrl.searchParams.set('q', q);
+                    // If checkbox selection mode is active, make sure rows adjust
+                    const selectHeader = document.getElementById('selectHeader');
+                    const isSelectionMode = selectHeader && selectHeader.style.display !== 'none';
+                    if (isSelectionMode) {
+                        const selectCells = document.querySelectorAll('.select-cell');
+                        if (selectCells) {
+                            selectCells.forEach(cell => cell.style.display = 'table-cell');
+                        }
+                    }
+
+                    // Highlight search text after rendering rows (GEMINI.md rule UX Enhancement)
+                    if (q) {
+                        highlightSearchText(q);
+                    }
                 } else {
-                    pushUrl.searchParams.delete('q');
+                    showPageError(data.message || 'Failed to load page content.');
+                    if (tableBody) tableBody.style.opacity = '1';
                 }
-                window.history.pushState({ page: page, q: q }, '', pushUrl.toString());
-
-                // If checkbox selection mode is active, make sure rows adjust
-                const selectHeader = document.getElementById('selectHeader');
-                const isSelectionMode = selectHeader && selectHeader.style.display !== 'none';
-                if (isSelectionMode) {
-                    const selectCells = document.querySelectorAll('.select-cell');
-                    if (selectCells) {
-                        selectCells.forEach(cell => cell.style.display = 'table-cell');
-                    }
-                }
-
-                // Highlight search text after rendering rows (GEMINI.md rule UX Enhancement)
-                if (q) {
-                    highlightSearchText(q);
-                }
-            } else {
-                showPageError(data.message || 'Failed to load page content.');
+            })
+            .catch(error => {
+                console.error('AJAX pagination error:', error);
+                showPageError('Failed to fetch page. Please check your network connection.');
                 if (tableBody) tableBody.style.opacity = '1';
-            }
-        })
-        .catch(error => {
-            console.error('AJAX pagination error:', error);
-            showPageError('Failed to fetch page. Please check your network connection.');
-            if (tableBody) tableBody.style.opacity = '1';
-        })
-        .finally(() => {
-            if (searchLoader) searchLoader.style.display = 'none';
-        });
+            })
+            .finally(() => {
+                if (searchLoader) searchLoader.style.display = 'none';
+            });
     }
 
     // Attach click listeners to pagination links dynamically using Event Delegation
@@ -994,7 +1007,7 @@ $campuses = ["MAIN", "BED"];
                 const link = e.target.closest('.page-link');
                 if (link) {
                     e.preventDefault();
-                    
+
                     const item = link.closest('.page-item');
                     if (item && (item.classList.contains('disabled') || item.classList.contains('active'))) {
                         return;
@@ -1022,12 +1035,15 @@ $campuses = ["MAIN", "BED"];
             }
             loadPage(page);
         });
-        
+
         // Save initial state to history for back/forward support
         const urlParams = new URLSearchParams(window.location.search);
         const initialPage = urlParams.get('page') || 1;
         const initialQ = urlParams.get('q') || '';
-        window.history.replaceState({ page: initialPage, q: initialQ }, '', window.location.href);
+        window.history.replaceState({
+            page: initialPage,
+            q: initialQ
+        }, '', window.location.href);
 
         // Search input event listener with 400ms debounce (GEMINI.md Search behavior rules)
         const searchInput = document.getElementById('table-search-input');
@@ -1043,7 +1059,7 @@ $campuses = ["MAIN", "BED"];
 
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.trim();
-                
+
                 // Show/hide clear button (GEMINI.md rule UX Enhancement)
                 if (clearSearchBtn) {
                     clearSearchBtn.style.display = query ? 'inline-block' : 'none';
@@ -1051,7 +1067,7 @@ $campuses = ["MAIN", "BED"];
 
                 // Debounce search
                 clearTimeout(searchTimeout);
-                
+
                 // Show loading indicator instantly for active response feel
                 const searchLoader = document.getElementById('search-loading-indicator');
                 if (searchLoader) searchLoader.style.display = 'flex';
@@ -1093,6 +1109,8 @@ $campuses = ["MAIN", "BED"];
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         background-color: var(--bg-light);
+        /* Force dark text — dark-mode.js may set data-bs-theme="dark" (white text) while this page stays light */
+        color: #212529;
         margin: 0;
         padding: 0;
     }
@@ -1284,6 +1302,7 @@ $campuses = ["MAIN", "BED"];
         padding: 15px 12px;
         border-bottom: 1px solid #e9ecef;
         vertical-align: middle;
+        color: #212529;
     }
 
     .canvass-table tbody tr:hover {
@@ -1553,6 +1572,7 @@ $campuses = ["MAIN", "BED"];
         .search-bar-container {
             padding: 15px;
         }
+
         .search-input-wrapper input {
             padding: 10px 35px 10px 40px;
             font-size: 0.9rem;

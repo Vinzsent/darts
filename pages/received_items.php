@@ -25,23 +25,62 @@ $user_id = $_SESSION['user']['id'] ?? 0;
 
 // Fetch purchase order records that are Approved or Received
 // Specifically those created by Purchasing Officer for transparency
+//
+// NOTE: name columns differ between deployments (firstname vs first_name), so probe
+// Query user table for names
+$user_cols = [];
+$name_res = $conn->query("SHOW COLUMNS FROM `user`");
+while ($name_res && $nc = $name_res->fetch_assoc()) {
+    $user_cols[] = $nc['Field'];
+}
+if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
+    $name_expr = "CONCAT_WS(' ', %s.first_name, %s.last_name)";
+} elseif (in_array('firstname', $user_cols, true) && in_array('lastname', $user_cols, true)) {
+    $name_expr = "CONCAT_WS(' ', %s.firstname, %s.lastname)";
+} elseif (in_array('name', $user_cols, true)) {
+    $name_expr = "%s.name";
+} else {
+    $name_expr = "%s.username";
+}
+$created_by_name = sprintf($name_expr, 'u_creator', 'u_creator');
+$received_by_name = sprintf($name_expr, 'u_receiver', 'u_receiver');
+
+// Probe columns in purchase_orders and purchase_order_items to avoid fatal schema mismatches
+$po_cols = [];
+$po_cols_res = $conn->query("SHOW COLUMNS FROM purchase_orders");
+while ($po_cols_res && $c = $po_cols_res->fetch_assoc()) {
+    $po_cols[] = $c['Field'];
+}
+$po_recv_col = in_array('received_date', $po_cols, true) ? 'p.received_date' : (in_array('date_received', $po_cols, true) ? 'p.date_received' : 'NULL');
+
+$poi_cols = [];
+$poi_cols_res = $conn->query("SHOW COLUMNS FROM purchase_order_items");
+while ($poi_cols_res && $c = $poi_cols_res->fetch_assoc()) {
+    $poi_cols[] = $c['Field'];
+}
+$poi_recv_col = in_array('received_date', $poi_cols, true) ? 'received_date' : (in_array('date_received', $poi_cols, true) ? 'date_received AS received_date' : 'NULL AS received_date');
+
 $query = "
     SELECT 
         p.po_id,
         p.po_number,
         p.po_date,
         p.supplier_name,
+        p.supplier_address,
         p.total_amount,
         p.status,
-        p.received_date,
-        CONCAT(u_creator.first_name, ' ', u_creator.last_name) as created_by_name,
-        CONCAT(u_receiver.first_name, ' ', u_receiver.last_name) as received_by_name,
-        COUNT(poi.poi_id) as item_count
+        $po_recv_col AS received_date,
+        p.received_notes,
+        MAX($created_by_name) as created_by_name,
+        MAX($received_by_name) as received_by_name,
+        COUNT(poi.poi_id) as item_count,
+        SUM(poi.is_received) as received_item_count
     FROM purchase_orders p
-    LEFT JOIN user u_creator ON p.created_by = u_creator.id
-    LEFT JOIN user u_receiver ON p.received_by = u_receiver.id
+    LEFT JOIN `user` u_creator ON p.created_by = u_creator.id
+    LEFT JOIN `user` u_receiver ON CAST(p.received_by AS UNSIGNED) = u_receiver.id
     LEFT JOIN purchase_order_items poi ON p.po_id = poi.po_id
-    GROUP BY p.po_id
+    GROUP BY p.po_id, p.po_number, p.po_date, p.supplier_name, p.supplier_address,
+             p.total_amount, p.status, $po_recv_col, p.received_notes
     ORDER BY CASE 
         WHEN p.status = 'Approved' THEN 0 
         WHEN p.status = 'Pending' THEN 1 
@@ -51,6 +90,22 @@ $query = "
 ";
 
 $result = $conn->query($query);
+if (!$result) {
+    $query_error = $conn->error;
+}
+
+// Line items per PO, for the expandable detail rows
+$items_map = [];
+$items_result = $conn->query("
+    SELECT poi_id, po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, $poi_recv_col
+    FROM purchase_order_items
+    ORDER BY po_id, item_number ASC
+");
+if ($items_result) {
+    while ($it = $items_result->fetch_assoc()) {
+        $items_map[$it['po_id']][] = $it;
+    }
+}
 ?>
 
 <style>
@@ -70,6 +125,8 @@ $result = $conn->query($query);
     body {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         background-color: var(--bg-light);
+        /* Force dark text — dark-mode.js may set data-bs-theme="dark" (white text) while this page stays light */
+        color: #212529;
         margin: 0;
         padding: 0;
     }
@@ -120,6 +177,7 @@ $result = $conn->query($query);
     .po-table td {
         padding: 15px 12px;
         border-bottom: 1px solid #e9ecef;
+        color: #212529;
     }
 
     .status-badge {
@@ -248,38 +306,125 @@ $result = $conn->query($query);
                     <th>Date</th>
                     <th>Supplier</th>
                     <th>Amount</th>
+                    <th>Items Received</th>
                     <th>Created By</th>
                     <th>Status</th>
                     <th>Marked Received By</th>
                     <th>Received Date</th>
-                    <th>Action</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if ($result && $result->num_rows > 0): ?>
+                <?php if (!$result): ?>
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 40px; color: #c82333;">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                            <p>Could not load purchase records.</p>
+                            <small><?= htmlspecialchars($query_error ?? 'Unknown database error') ?></small>
+                        </td>
+                    </tr>
+                <?php elseif ($result->num_rows > 0): ?>
                     <?php while ($row = $result->fetch_assoc()): ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars($row['po_number']) ?></strong></td>
-                            <td><?= date('M d, Y', strtotime($row['po_date'])) ?></td>
-                            <td><?= htmlspecialchars($row['supplier_name']) ?></td>
-                            <td>₱<?= number_format($row['total_amount'], 2) ?></td>
-                            <td><?= htmlspecialchars($row['created_by_name']) ?></td>
+                        <?php
+                        $row_items = $items_map[$row['po_id']] ?? [];
+                        $total_items = (int)$row['item_count'];
+                        $received_items = (int)($row['received_item_count'] ?? 0);
+                        $all_received = $total_items > 0 && $received_items >= $total_items;
+                        $has_outstanding = $received_items < $total_items;
+                        ?>
+                        <tr class="po-row" style="cursor: pointer;" onclick="togglePoItems(this, event)">
                             <td>
-                                <span class="status-badge status-<?= strtolower($row['status']) ?>">
-                                    <?= htmlspecialchars($row['status']) ?>
+                                <strong><?= htmlspecialchars($row['po_number']) ?></strong>
+                                <i class="fas fa-caret-down" style="opacity: 0.6; margin-left: 5px;" title="Click to view items"></i>
+                            </td>
+                            <td><?= date('M d, Y', strtotime($row['po_date'])) ?></td>
+                            <td>
+                                <div>
+                                    <?= htmlspecialchars($row['supplier_name']) ?>
+                                    <?php if (!empty($row['supplier_address'])): ?>
+                                        <br><small class="text-muted"><?= htmlspecialchars($row['supplier_address']) ?></small>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td>₱<?= number_format($row['total_amount'], 2) ?></td>
+                            <td>
+                                <span class="badge" style="font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: bold;
+                                    background-color: <?= $all_received ? 'var(--accent-green-approved)' : 'var(--accent-orange)' ?>; color: white;">
+                                    <?= $received_items ?> / <?= $total_items ?>
                                 </span>
+                                <?php if ($has_outstanding && $total_items > 0): ?>
+                                    <br><small class="text-muted"><?= $total_items - $received_items ?> outstanding</small>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($row['created_by_name'] ?? '---') ?></td>
+                            <td>
+                                <?php if ($all_received || $row['status'] === 'Received'): ?>
+                                    <span class="badge bg-success" style="background-color: var(--accent-green-approved); color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">
+                                        <i class="fas fa-check-circle"></i> Fully Received
+                                    </span>
+                                <?php elseif ($received_items > 0): ?>
+                                    <span class="badge bg-warning text-dark" style="padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">
+                                        <i class="fas fa-clock"></i> Partially Received
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge bg-secondary" style="background-color: #6c757d; color: white; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 0.85rem;">
+                                        <i class="fas fa-hourglass-half"></i> Pending
+                                    </span>
+                                <?php endif; ?>
                             </td>
                             <td><?= htmlspecialchars($row['received_by_name'] ?? '---') ?></td>
                             <td><?= $row['received_date'] ? date('M d, Y g:i A', strtotime($row['received_date'])) : '---' ?></td>
-                            <td>
-                                <?php if ($row['status'] !== 'Received' && (in_array($user_type, ['propertycustodian', 'supplyincharge', 'purchasingofficer', 'purchasingstaff', 'admin']))): ?>
-                                    <button class="btn-received" onclick="markAsReceived(<?= $row['po_id'] ?>)">
-                                        <i class="fas fa-check-circle"></i> Mark Received
-                                    </button>
-                                <?php elseif ($row['status'] === 'Received'): ?>
-                                    <span class="badge bg-success"><i class="fas fa-check"></i> Already Received</span>
+                        </tr>
+                        <!-- Expandable per-item detail row -->
+                        <tr class="po-items-row" style="display: none; background-color: #f8f9fa;">
+                            <td colspan="9" style="padding: 14px 20px;">
+                                <h5 style="font-size: 1rem; margin-bottom: 8px; color: var(--primary-green);">
+                                    <i class="fas fa-box-open"></i> Received Item Details
+                                </h5>
+
+                                <?php if (!empty($row['received_notes'])): ?>
+                                    <div style="background:#fff; border:1px solid #e9ecef; border-left:4px solid var(--primary-green);
+                                                border-radius:4px; padding:8px 12px; margin-bottom:12px;">
+                                        <strong style="font-size: 0.85rem;">Receiving Notes:</strong>
+                                        <div style="font-size: 0.9rem; white-space: pre-wrap;"><?= htmlspecialchars($row['received_notes']) ?></div>
+                                    </div>
+                                <?php endif; ?>
+
+                                <?php if ($row_items): ?>
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem; background:#fff;">
+                                        <thead>
+                                            <tr>
+                                                <th style="text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 50px;">#</th>
+                                                <th style="text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--primary-green);">Item Description</th>
+                                                <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 90px;">Quantity</th>
+                                                <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 110px;">Unit Cost</th>
+                                                <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 120px;">Line Total</th>
+                                                <th style="text-align: center; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 150px;">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($row_items as $ritem): ?>
+                                                <tr>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef;"><?= (int)$ritem['item_number'] ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef;"><?= htmlspecialchars($ritem['item_description']) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;"><?= htmlspecialchars($ritem['quantity']) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['unit_cost'], 2) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['line_total'], 2) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: center;">
+                                                        <?php if ((int)$ritem['is_received'] === 1): ?>
+                                                            <span class="badge bg-success"><i class="fas fa-check"></i> Received</span>
+                                                            <?php if (!empty($ritem['received_date'])): ?>
+                                                                <br><small class="text-muted"><?= date('M d, Y g:i A', strtotime($ritem['received_date'])) ?></small>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary"><i class="fas fa-clock"></i> Pending</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
                                 <?php else: ?>
-                                    <span class="text-muted">No Action</span>
+                                    <em style="color: #6c757d;">No items recorded for this purchase order.</em>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -298,8 +443,35 @@ $result = $conn->query($query);
 </div>
 
 <script>
-    function markAsReceived(poId) {
-        if (!confirm('Are you sure you want to mark this item as received?')) return;
+    // Expand/collapse the per-item detail row when clicking a PO row
+    function togglePoItems(row, event) {
+        // Don't toggle when a button/link inside the row was clicked
+        if (event && event.target.closest('button, a')) return;
+
+        const detailRow = row.nextElementSibling;
+        if (detailRow && detailRow.classList.contains('po-items-row')) {
+            const isOpen = detailRow.style.display !== 'none';
+            detailRow.style.display = isOpen ? 'none' : 'table-row';
+
+            const caret = row.querySelector('.fa-caret-down, .fa-caret-right');
+            if (caret) {
+                caret.classList.toggle('fa-caret-down', isOpen);
+                caret.classList.toggle('fa-caret-right', !isOpen);
+            }
+        }
+    }
+
+    function markAsReceived(poId, btn) {
+        if (!confirm('Mark this purchase order and all of its items as received?')) return;
+
+        // Remember the button's own label so a failed save restores the right text
+        // (it is "Mark Received" or "Receive Remaining" depending on the state).
+        const restoreLabel = btn ? btn.innerHTML : '';
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        }
 
         fetch('../actions/mark_as_received.php', {
                 method: 'POST',
@@ -307,7 +479,10 @@ $result = $conn->query($query);
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    po_id: poId
+                    po_id: poId,
+                    // Keep the item flags in step with the PO status, otherwise this
+                    // page would still report the PO as partially received.
+                    mark_all_items: true
                 })
             })
             .then(response => response.json())
@@ -317,11 +492,19 @@ $result = $conn->query($query);
                     location.reload();
                 } else {
                     alert('Error: ' + data.message);
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = restoreLabel;
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 alert('An error occurred. Please try again.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = restoreLabel;
+                }
             });
     }
 </script>

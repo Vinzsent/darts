@@ -154,7 +154,7 @@ if ($report_type === 'issuance') {
     if (!empty($date_start)) $w[] = "sr.date_requested >= '" . safe($conn, $date_start) . " 00:00:00'";
     if (!empty($date_end))   $w[] = "sr.date_requested <= '" . safe($conn, $date_end)   . " 23:59:59'";
     $where = "WHERE " . implode(' AND ', $w);
-    $res = $conn->query("SELECT sr.*, CONCAT_WS(' ', u.first_name, u.last_name) AS requester_name FROM supply_request sr LEFT JOIN user u ON u.id = sr.user_id $where ORDER BY sr.date_requested DESC");
+    $res = $conn->query("SELECT sr.*, CONCAT_WS(' ', u.first_name, u.last_name) AS requester_name FROM supply_request sr LEFT JOIN employees u ON u.id = sr.user_id $where ORDER BY sr.date_requested DESC");
 
     ob_start(); ?>
     <table class="report-table">
