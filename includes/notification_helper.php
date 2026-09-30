@@ -59,7 +59,7 @@ function notifyPropertyRequestSubmitted($request_id, $department, $description, 
 
     $success = true;
     try {
-        $role_sql = "SELECT id FROM user WHERE user_type = ?";
+        $role_sql = "SELECT id FROM employees WHERE user_type = ?";
         $stmt = $conn->prepare($role_sql);
         foreach ($roles as $role) {
             $stmt->bind_param("s", $role);
@@ -160,7 +160,7 @@ function notifySupplyRequestSubmitted($request_id, $department, $description, $r
 
     // Notify all users matching the selected roles
     try {
-        $role_sql = "SELECT id FROM user WHERE user_type = ?";
+        $role_sql = "SELECT id FROM employees WHERE user_type = ?";
         $stmt = $conn->prepare($role_sql);
         foreach ($base_roles as $role) {
             $stmt->bind_param("s", $role);
@@ -264,7 +264,7 @@ function findRequesterByDepartment($department, $conn)
         ];
 
         // Try to find by exact department match first
-        $sql = "SELECT id FROM user WHERE user_type = ? LIMIT 1";
+        $sql = "SELECT id FROM employees WHERE user_type = ? LIMIT 1";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("s", $department);
         $stmt->execute();
@@ -290,7 +290,7 @@ function findRequesterByDepartment($department, $conn)
         }
 
         // If still not found, try to find any user with similar user_type
-        $sql = "SELECT id FROM user WHERE user_type LIKE ? LIMIT 1";
+        $sql = "SELECT id FROM employees WHERE user_type LIKE ? LIMIT 1";
         $stmt = $conn->prepare($sql);
         $search_term = "%" . $department . "%";
         $stmt->bind_param("s", $search_term);
@@ -303,7 +303,7 @@ function findRequesterByDepartment($department, $conn)
         }
 
         // Default: return the first user (fallback)
-        $sql = "SELECT id FROM user LIMIT 1";
+        $sql = "SELECT id FROM employees LIMIT 1";
         $result = $conn->query($sql);
         if ($result && $result->num_rows > 0) {
             $row = $result->fetch_assoc();
@@ -385,7 +385,7 @@ function notifyStaffAndFacultyForIssuance($request_id, $issued_by, $description,
 
     $success = true;
     try {
-        $sql = "SELECT id FROM user WHERE user_type IN ('Staff','Faculty')";
+        $sql = "SELECT id FROM employees WHERE user_type IN ('Staff','Faculty')";
         $res = $conn->query($sql);
         if ($res) {
             while ($row = $res->fetch_assoc()) {
