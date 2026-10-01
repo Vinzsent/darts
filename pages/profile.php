@@ -397,13 +397,17 @@ unset($_SESSION['profile_success'], $_SESSION['profile_error']);
 
     <!-- Tab Navigation -->
     <div class="profile-tabs">
-        <button class="profile-tab active" onclick="switchTab('account', this)">
+        <!-- Single section: shown as a static heading rather than a clickable tab,
+             since there is nothing to switch to. -->
+        <div class="profile-tab active">
             <i class="fas fa-lock me-2"></i>Account &amp; Security
-        </button>
+        </div>
     </div>
 
     <!-- ═══════════════════════════ ACCOUNT TAB ══════════════════════════ -->
-    <div id="tab-account" class="tab-pane">
+    <div id="tab-account" class="tab-pane active">
+        <!-- Always rendered on load: .tab-pane defaults to display:none, and this
+             section previously stayed invisible unless the URL had ?tab=account. -->
         <form action="../actions/update_profile.php" method="POST" id="form-account">
             <input type="hidden" name="tab" value="account">
 
@@ -501,11 +505,14 @@ unset($_SESSION['profile_success'], $_SESSION['profile_error']);
 
 <script>
     /* ── Tab switching ── */
+    /* ── Tab switching ──
+       There is a single section now, so this is kept only so any older link that
+       still passes ?tab=... cannot blank the page. It re-applies `active` to the
+       one pane instead of removing it from every pane first. */
     function switchTab(name, btn) {
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.profile-tab').forEach(b => b.classList.remove('active'));
-        document.getElementById('tab-' + name).classList.add('active');
-        btn.classList.add('active');
+        const pane = document.getElementById('tab-' + name) || document.getElementById('tab-account');
+        if (pane) pane.classList.add('active');
+        if (btn) btn.classList.add('active');
     }
 
     /* ── Password visibility toggle ── */
@@ -583,7 +590,8 @@ unset($_SESSION['profile_success'], $_SESSION['profile_error']);
     /* ── Activate account tab if redirected to it ── */
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('tab') === 'account') {
-        // The Account tab is now the only one, so select it by id rather than index.
+        // The account pane is already active from the server-rendered markup; this
+        // only re-asserts it so a stale ?tab= link can never leave it hidden.
         switchTab('account', document.querySelector('.profile-tab'));
     }
 </script>
