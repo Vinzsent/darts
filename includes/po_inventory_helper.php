@@ -178,6 +178,41 @@ function po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new, $notes, $
 }
 
 /**
+ * Remember that a PO line was posted into a specific inventory row.
+ *
+ * An inventory row can hold only ONE source_poi_id (UNIQUE index), so when several
+ * lines of the same PO land on one shared row, only the first can use that column.
+ * This table keeps the remaining lines protected against double-posting.
+ *
+ * Failures are non-fatal: stock is already updated by the time this runs.
+ */
+function po_record_item_link($conn, $table, $inventory_id, $poi_id, $po_id, $item_name, $qty)
+{
+    if ($poi_id <= 0) {
+        return false;
+    }
+    $stmt = $conn->prepare(
+        "INSERT IGNORE INTO po_item_inventory_links (poi_id, inventory_table, inventory_id, po_id, item_name, quantity_added)
+         VALUES (?, ?, ?, ?, ?, ?)"
+    );
+    if (!$stmt) {
+        return false;
+    }
+    // bind_param needs variables passed by reference, so nothing may be inlined.
+    $inv_table = (string)$table;
+    $inv_id    = (int)$inventory_id;
+    $po_id_val = (int)$po_id;
+    $name      = (string)$item_name;
+    $qty_val   = (float)$qty;
+
+    $stmt->bind_param('issids', $poi_id, $inv_table, $inv_id,
+                       $po_id_val, $name, $qty_val);
+    $ok = $stmt->execute();
+    $stmt->close();
+    return (bool)$ok;
+}
+
+/**
  * Post a single received PO line into inventory.
  *
  * @return array ['status' => 'created'|'incremented'|'skipped'|'error', 'message'=>string, ...]
@@ -199,7 +234,22 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         return ['status' => 'skipped', 'message' => 'Quantity is 0; not added to stock.'];
     }
 
-    // Idempotency guard: has this PO line already been posted?
+    // Idempotency guard, part 1: the link table. A PO line that was merged into a
+    // shared inventory row is recorded here, because the inventory row can only
+    // carry ONE source_poi_id and would otherwise lose its protection.
+    $lk = $conn->prepare("SELECT inventory_id FROM po_item_inventory_links WHERE poi_id = ? LIMIT 1");
+    if ($lk) {
+        $lk->bind_param('i', $poi_id);
+        $lk->execute();
+        $lk_res = $lk->get_result();
+        if ($lk_res && $lk_res->num_rows > 0) {
+            $lk->close();
+            return ['status' => 'skipped', 'message' => 'Already added to inventory.'];
+        }
+        $lk->close();
+    }
+
+    // Idempotency guard, part 2: the direct source_poi_id on the inventory row.
     $chk = $conn->prepare("SELECT inventory_id FROM `{$table}` WHERE source_poi_id = ? LIMIT 1");
     if ($chk) {
         $chk->bind_param('i', $poi_id);
@@ -212,7 +262,31 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         $chk->close();
     }
 
-    $match = po_find_matching_inventory($conn, $table, $desc);
+    // Prefer a row already posted from THIS same PO with the same description.
+    // A PO often repeats an item on several lines; without this, each repeat would
+    // create yet another row instead of adding to the first one.
+    $sib = $conn->prepare(
+        "SELECT inventory_id, COALESCE(current_stock,0) AS stock
+         FROM `{$table}`
+         WHERE source_po_id = ? AND LOWER(TRIM(item_name)) = LOWER(TRIM(?))
+         ORDER BY inventory_id ASC LIMIT 1"
+    );
+    if ($sib) {
+        $sib->bind_param('is', $po_id, $desc);
+        $sib->execute();
+        $sib_res = $sib->get_result();
+        if ($sib_res && $sib_row = $sib_res->fetch_assoc()) {
+            $sib->close();
+            $match = ['inventory_id' => (int)$sib_row['inventory_id'],
+                      'current_stock' => (int)$sib_row['stock'],
+                      'match' => 'same-po'];
+        } else {
+            $sib->close();
+            $match = po_find_matching_inventory($conn, $table, $desc);
+        }
+    } else {
+        $match = po_find_matching_inventory($conn, $table, $desc);
+    }
     $po_number = (string)($po['po_number'] ?? '');
 
     if ($match) {
@@ -220,17 +294,24 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         $prev   = (int)$match['current_stock'];
         $new    = $prev + $qty;
 
-        $upd = $conn->prepare("UPDATE `{$table}` SET current_stock = ?, source_po_id = ?, source_poi_id = ? WHERE inventory_id = ?");
+        // Backfill receiver too — a matched row created before this fix may have
+        // a NULL receiver and would stay hidden behind the page's receiver filter.
+        $receiver_label = ($table === 'property_inventory') ? 'Property Custodian' : 'Supply In-charge';
+        // Do NOT overwrite source_poi_id here: it is UNIQUE and already belongs to
+        // the row's first PO line. This line is tracked in po_item_inventory_links.
+        $upd = $conn->prepare("UPDATE `{$table}` SET current_stock = ?, receiver = COALESCE(NULLIF(receiver, ''), ?) WHERE inventory_id = ?");
         if (!$upd) {
             return ['status' => 'error', 'message' => 'DB error: ' . $conn->error];
         }
-        $upd->bind_param('iiii', $new, $po_id, $poi_id, $inv_id);
+        $upd->bind_param('isi', $new, $receiver_label, $inv_id);
         if (!$upd->execute()) {
             $msg = 'DB error: ' . $upd->error;
             $upd->close();
             return ['status' => 'error', 'message' => $msg];
         }
         $upd->close();
+
+        po_record_item_link($conn, $table, $inv_id, $poi_id, $po_id, $desc, $qty);
 
         po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new,
             "Received from PO {$po_number} ({$match['match']} match)", $user_id);
@@ -242,16 +323,22 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
 
     // No confident match — create a new row so the item is at least findable.
     $category = po_default_category($table);
+    // `receiver` matters: property_inventory.php filters on
+    // receiver = 'Property Custodian', so a row posted without it would be invisible.
+    $receiver_label = ($table === 'property_inventory') ? 'Property Custodian' : 'Supply In-charge';
+    // PO lines carry no brand, and a NULL brand triggers "Passing null to
+    // htmlspecialchars()" deprecation warnings wherever the row is displayed.
+    $brand_label = 'N/A';
     $ins = $conn->prepare(
-        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, status, source_po_id, source_poi_id, date_created)
-         VALUES (?, ?, ?, ?, 'pcs', ?, 'Active', ?, ?, NOW())"
+        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, brand, status, receiver, source_po_id, source_poi_id, date_created)
+         VALUES (?, ?, ?, ?, 'pcs', ?, ?, 'Active', ?, ?, ?, NOW())"
     );
     if (!$ins) {
         return ['status' => 'error', 'message' => 'DB error: ' . $conn->error];
     }
     // Placeholders in order: item_name, category, current_stock, quantity,
-    // unit_cost, source_po_id, source_poi_id  -> "ss" + "ii" + "d" + "ii"
-    $ins->bind_param('ssiidii', $desc, $category, $qty, $qty, $unit_cost, $po_id, $poi_id);
+    // unit_cost, brand, receiver, source_po_id, source_poi_id -> "ss"+"ii"+"d"+"s"+"s"+"ii"
+    $ins->bind_param('ssiidssii', $desc, $category, $qty, $qty, $unit_cost, $brand_label, $receiver_label, $po_id, $poi_id);
     if (!$ins->execute()) {
         $msg = 'DB error: ' . $ins->error;
         $ins->close();
@@ -259,6 +346,8 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     }
     $new_id = (int)$conn->insert_id;
     $ins->close();
+
+    po_record_item_link($conn, $table, $new_id, $poi_id, $po_id, $desc, $qty);
 
     po_write_stock_log($conn, $table, $new_id, $qty, 0, $qty,
         "Received from PO {$po_number} (new item)", $user_id);
