@@ -11,6 +11,20 @@ include '../includes/header.php';
 $user_type = $_SESSION['user_type'] ?? '';
 $user_role_norm = str_replace([' ', '-'], '', strtolower($user_type));
 
+// Editing a purchase order corrects wrongly-entered header/line details, so it is
+// limited to the purchasing roles that own the document, plus Admin.
+// Office roles (Supply In-charge, Property Custodian) only receive items, so they
+// must not be able to rewrite the order itself.
+$purchasing_roles = [
+    'admin',
+    'administrator',
+    'purchasingofficer',
+    'purchasingstaff',
+    'purchaser',
+    'purchasing',
+];
+$can_edit_po = in_array($user_role_norm, $purchasing_roles, true);
+
 // Where received items land in stock is fixed by the user's office:
 //   Supply In-charge  -> inventory
 //   Property Custodian-> property_inventory
@@ -655,9 +669,14 @@ $verifier_name = 'Marilou L. Suarez';
                             </td>
                             <td>
                                 <div class="table-actions">
-                                    <button class="btn btn-info btn-sm" onclick="viewPurchaseOrder(<?= $po['po_id'] ?>)">
+                                    <button class="btn btn-info btn-sm" onclick="viewPurchaseOrder(<?= (int)$po['po_id'] ?>)">
                                         <i class="fas fa-eye"></i> View
                                     </button>
+                                    <?php if ($can_edit_po): ?>
+                                        <button class="btn btn-warning btn-sm" onclick="editPurchaseOrder(<?= (int)$po['po_id'] ?>)" title="Edit this purchase order">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             </td>
                         </tr>
