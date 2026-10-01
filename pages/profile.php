@@ -12,16 +12,41 @@ if (!$user_id) {
     exit;
 }
 
-// Fetch fresh user data
-$stmt = $conn->prepare("SELECT * FROM employees WHERE id = ? LIMIT 1");
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+// Fetch fresh user data.
+//
+// Login (index.php) reads from the `user` table/view, but this page previously
+// queried `employees`. When those two are not perfectly in sync — e.g. the deployed
+// database keeps `user` as a separate table with its own IDs — the lookup returns
+// nothing and the guard below bounced the user to the login page even though they
+// were logged in correctly. Read from `user` first (same source as login) and fall
+// back to `employees` so a profile always resolves.
+$fetch_user = function ($conn, $user_id) {
+    foreach (['user', 'employees'] as $table) {
+        $stmt = $conn->prepare("SELECT * FROM `{$table}` WHERE id = ? LIMIT 1");
+        if (!$stmt) {
+            continue; // table missing or query failed - try the next one
+        }
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row) {
+            return $row;
+        }
+    }
+    return null;
+};
 
-if (!$user) {
-    header('Location: ../index.php');
-    exit;
+$user = $user_id ? $fetch_user($conn, $user_id) : null;
+
+// Fall back to the session copy so a transient lookup miss never logs the user out.
+if (!$user && isset($_SESSION['user']) && is_array($_SESSION['user'])) {
+    $user = $_SESSION['user'];
+} elseif (!$user) {
+    $user = [
+        'username' => $_SESSION['username'] ?? '',
+        'user_type' => $_SESSION['user_type'] ?? '',
+    ];
 }
 
 // Personal details (name, title, department, role) are read-only here and are
