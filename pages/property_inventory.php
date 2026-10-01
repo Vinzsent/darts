@@ -1565,7 +1565,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td><?= htmlspecialchars($row['description'] ?? '') ?></td>
                                         <td class="text-center"><strong><?= $row['current_stock'] ?></strong></td>
                                         <td><?= $row['unit'] ?></td>
-                                        <td><?= htmlspecialchars($row['brand']) ?></td>
+                                        <td><?= htmlspecialchars($row['brand'] ?? '') ?></td>
                                         <td>
                                             <span class="badge bg-<?= $stock_level == 'out' ? 'danger' : ($stock_level == 'critical' ? 'warning' : 'success') ?>">
                                                 <?= ucfirst($stock_level) ?>
@@ -3197,7 +3197,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '<td>' . htmlspecialchars($row['description'] ?? '') . '</td>';
                     echo '<td class="text-center"><strong>' . $row['current_stock'] . '</strong></td>';
                     echo '<td>' . $row['unit'] . '</td>';
-                    echo '<td>' . htmlspecialchars($row['brand']) . '</td>';
+                    echo '<td>' . htmlspecialchars($row['brand'] ?? '') . '</td>';
 
                     echo '<td><span class="badge bg-' . ($stock_level == 'out' ? 'danger' : ($stock_level == 'critical' ? 'warning' : 'success')) . '">' . ucfirst($stock_level) . '</span></td>';
                     echo '<td>' . ($row['date_created'] ? date('M d, Y', strtotime($row['date_created'])) : 'N/A') . '</td>';
