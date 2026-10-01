@@ -39,7 +39,9 @@ if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols
 }
 $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 
-// Fetch purchase order records with user information
+// Search: match PO number, supplier, or any line item description.
+$search_term = trim($_GET['search'] ?? '');
+
 $po_query = "
     SELECT 
         p.po_id,
@@ -52,15 +54,35 @@ $po_query = "
         p.notes,
         p.created_at,
         $created_by_expr as created_by_name,
-        COUNT(poi.poi_id) as item_count
+        COUNT(poi.poi_id) as item_count,
+        SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) as received_item_count
     FROM purchase_orders p
     LEFT JOIN `user` u ON p.created_by = u.id
     LEFT JOIN purchase_order_items poi ON p.po_id = poi.po_id
-    GROUP BY p.po_id
-    ORDER BY p.created_at DESC
+    WHERE (
+        ? = ''
+        OR p.po_number LIKE ?
+        OR p.supplier_name LIKE ?
+        OR EXISTS (
+            SELECT 1 FROM purchase_order_items si
+            WHERE si.po_id = p.po_id AND si.item_description LIKE ?
+        )
+    )
+    GROUP BY p.po_id, p.po_number, p.po_date, p.supplier_name, p.supplier_address,
+             p.total_amount, p.status, p.notes, p.created_at, $created_by_expr
+    ORDER BY
+        -- Items already received (e.g. by the property custodian) come first,
+        -- fully-received POs ahead of partially-received ones, then newest.
+        (SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) > 0) DESC,
+        (SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) = COUNT(poi.poi_id)) DESC,
+        p.created_at DESC
 ";
 
-$po_result = $conn->query($po_query);
+$po_stmt = $conn->prepare($po_query);
+$like = '%' . $search_term . '%';
+$po_stmt->bind_param("ssss", $search_term, $like, $like, $like);
+$po_stmt->execute();
+$po_result = $po_stmt->get_result();
 
 // Items grouped by PO (for the click-to-expand sub-rows)
 $items_map = [];
@@ -524,6 +546,21 @@ $verifier_name = 'Marilou L. Suarez';
         <div class="list-header">
             <h2 class="list-title">All Purchase Order Records</h2>
             <div class="action-buttons">
+                <form method="GET" action="purchase_order_list.php" class="d-flex align-items-center" style="gap:.5rem;">
+                    <input type="text" name="search" id="poSearchInput" class="form-control form-control-sm"
+                           placeholder="Search item, PO no., or supplier..."
+                           value="<?= htmlspecialchars($search_term) ?>"
+                           style="width: 320px;" aria-label="Search purchase orders">
+                    <button type="submit" class="btn btn-sm" style="background:#fff;color:var(--primary-green);">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <?php if ($search_term !== ''): ?>
+                        <a href="purchase_order_list.php" class="btn btn-sm" style="background:#fff;color:var(--primary-green);"
+                           title="Clear search">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    <?php endif; ?>
+                </form>
                 <a href="../actions/export_purchase_orders_excel.php" class="btn btn-success">
                     <i class="fas fa-file-excel"></i> Export to Excel
                 </a>
@@ -535,6 +572,14 @@ $verifier_name = 'Marilou L. Suarez';
             </div>
         </div>
 
+        <?php if ($search_term !== ''): ?>
+            <div style="padding: 10px 20px; background:#e8f4ec; border-bottom:1px solid #d1dbd5; font-size:.9rem;">
+                <i class="fas fa-filter"></i>
+                Showing results for <strong><?= htmlspecialchars($search_term) ?></strong>
+                — purchase orders with <strong>already-received items are listed first</strong>.
+            </div>
+        <?php endif; ?>
+
         <?php if ($po_result && $po_result->num_rows > 0): ?>
             <table class="po-table">
                 <thead>
@@ -544,6 +589,7 @@ $verifier_name = 'Marilou L. Suarez';
                         <th>Supplier</th>
                         <th>Total Amount</th>
                         <th>Items</th>
+                        <th>Received</th>
                         <th>Status</th>
                         <th>Created By</th>
                         <th>Created At</th>
@@ -575,6 +621,28 @@ $verifier_name = 'Marilou L. Suarez';
                                 <i class="fas fa-caret-down" style="opacity: 0.6; margin-left: 5px;" title="Click to view items"></i>
                             </td>
                             <td>
+                                <?php
+                                $row_total = (int)$po['item_count'];
+                                $row_recv  = (int)($po['received_item_count'] ?? 0);
+                                if ($row_total > 0 && $row_recv >= $row_total) {
+                                    $recv_label  = 'Fully Received';
+                                    $recv_bg     = 'var(--accent-green-approved)';
+                                } elseif ($row_recv > 0) {
+                                    $recv_label  = 'Partially Received';
+                                    $recv_bg     = 'var(--accent-orange)';
+                                } else {
+                                    $recv_label  = 'None';
+                                    $recv_bg     = '#6c757d';
+                                }
+                                ?>
+                                <span class="badge" style="background-color: <?= $recv_bg ?>; color: white;
+                                                     font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold;">
+                                    <?= $row_recv ?> / <?= $row_total ?>
+                                </span>
+                                <br>
+                                <small class="text-muted"><?= $recv_label ?></small>
+                            </td>
+                            <td>
                                 <span class="status-badge status-<?= strtolower($po['status']) ?>">
                                     <?= htmlspecialchars($po['status']) ?>
                                 </span>
@@ -595,7 +663,7 @@ $verifier_name = 'Marilou L. Suarez';
                         </tr>
                         <!-- Expandable items sub-row -->
                         <tr class="po-items-row" style="display: none; background-color: #f8f9fa;">
-                            <td colspan="9" style="padding: 12px 20px;">
+                            <td colspan="10" style="padding: 12px 20px;">
                                 <?php $row_items = $items_map[$po['po_id']] ?? []; ?>
                                 <?php if ($row_items): ?>
                                     <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
