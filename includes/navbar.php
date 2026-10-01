@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Calculate the path prefix based on the current script location
 // This ensures links work from both the root and the /pages/ directory
 $current_script = $_SERVER['SCRIPT_NAME'];
@@ -19,7 +19,7 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false) ? '../' : './';
 
     <!-- Notification Bell -->
     <div class="notification-container me-3 position-relative">
-      <button id="notificationBell" class="btn btn-outline-light notification-btn" aria-label="Notifications">
+      <button type="button" id="notificationBell" class="btn btn-outline-light notification-btn" aria-label="Notifications">
         <i class="fas fa-bell"></i>
         <span class="notification-badge" id="notificationCount" style="display: none;">0</span>
       </button>
@@ -28,7 +28,7 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false) ? '../' : './';
       <div class="notification-dropdown" id="notificationDropdown">
         <div class="notification-header">
           <h6 class="mb-0"><i class="fas fa-bell me-2"></i>Notifications</h6>
-          <button class="btn btn-sm btn-outline-primary" id="markAllRead">Mark all read</button>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="markAllRead">Mark all read</button>
         </div>
         <div class="notification-list" id="notificationList">
           <!-- Notifications will be loaded here -->
@@ -39,8 +39,8 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false) ? '../' : './';
       </div>
     </div>
 
-    <button id="darkModeToggle" onclick="toggleDarkMode()" class="btn btn-outline-light me-2" aria-label="Toggle dark mode">🌙</button>
-    <a href="<?= $path_prefix ?>logout.php" class="btn btn-outline-light">🔓 Logout</a>
+    <button type="button" id="darkModeToggle" onclick="toggleDarkMode()" class="btn btn-outline-light me-2" aria-label="Toggle dark mode">ðŸŒ™</button>
+    <a href="<?= $path_prefix ?>logout.php" class="btn btn-outline-light">ðŸ”“ Logout</a>
   </div>
 </nav>
 

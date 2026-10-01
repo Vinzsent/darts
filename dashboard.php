@@ -1,7 +1,7 @@
-<?php
+﻿<?php
 $pageTitle = 'DARTS';
 include 'includes/auth.php';
-// db.php provides $conn — required by the profile card query further down.
+// db.php provides $conn â€” required by the profile card query further down.
 include 'includes/db.php';
 include 'includes/header.php';
 
@@ -171,7 +171,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     background: linear-gradient(135deg, #dc3545, #e83e8c);
   }
 
-  /* Profile card — gold gradient accent */
+  /* Profile card â€” gold gradient accent */
   .card-profile {
     background: linear-gradient(135deg, rgba(255, 255, 255, .97) 0%, rgba(255, 251, 230, .97) 100%);
     border: 1px solid rgba(234, 202, 38, .25);
@@ -438,62 +438,78 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     }
   }
 
-  /* Loading animation for cards */
+  /* â”€â”€ Card entrance: faster and subtler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+     The delay is derived from a per-card --i custom property that the markup
+     loop sets, so it scales to any number of cards. The previous version had
+     nth-child rules for only 10 cards while the admin dashboard renders 23,
+     which made cards 11+ animate first and the rest trickle in after them.
+
+     --card-anim: [duration, easing, delay]  (shorthand for the animation property)
+     --i: zero-based index assigned by the render loop below. */
   .menu-card {
-    animation: fadeInUp 0.6s ease-out;
+    opacity: 0;
+    animation: cardIn 0.28s cubic-bezier(.2, .7, .3, 1) both;
+    animation-delay: calc(var(--i, 0) * 0.022s);
   }
 
-  @keyframes fadeInUp {
+  @keyframes cardIn {
     from {
       opacity: 0;
-      transform: translateY(30px);
+      transform: translateY(8px) scale(.985);
     }
 
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
 
-  /* Stagger animation for cards */
-  .menu-card:nth-child(1) {
-    animation-delay: 0.1s;
+  /* Icon pops in just after its card, slightly behind it so it reads as one motion. */
+  .menu-card .card-icon {
+    animation: iconIn 0.3s cubic-bezier(.34, 1.4, .5, 1) both;
+    animation-delay: calc(var(--i, 0) * 0.022s + 0.05s);
   }
 
-  .menu-card:nth-child(2) {
-    animation-delay: 0.2s;
+  @keyframes iconIn {
+    from {
+      opacity: 0;
+      transform: scale(.85);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
-  .menu-card:nth-child(3) {
-    animation-delay: 0.3s;
+  /* Hover lift â€” snappier than before, and it must not fight the entrance
+     animation (which has finished by then and holds the final transform). */
+  .menu-card:hover {
+    transform: translateY(-3px);
   }
 
-  .menu-card:nth-child(4) {
-    animation-delay: 0.4s;
+  .menu-card .card-button:hover {
+    transform: translateY(-1px);
   }
 
-  .menu-card:nth-child(5) {
-    animation-delay: 0.5s;
-  }
+  /* Respect users who ask the OS to reduce motion. */
+  @media (prefers-reduced-motion: reduce) {
 
-  .menu-card:nth-child(6) {
-    animation-delay: 0.6s;
-  }
+    .menu-card,
+    .menu-card .card-icon {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
 
-  .menu-card:nth-child(7) {
-    animation-delay: 0.7s;
-  }
+    .menu-card {
+      transition: none;
+    }
 
-  .menu-card:nth-child(8) {
-    animation-delay: 0.8s;
-  }
-
-  .menu-card:nth-child(9) {
-    animation-delay: 0.9s;
-  }
-
-  .menu-card:nth-child(10) {
-    animation-delay: 1.0s;
+    .modal-overlay,
+    .modal-content {
+      animation: none;
+    }
   }
 
   /* Dark mode overrides specific to this dashboard */
@@ -650,7 +666,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         </div>
         <h3 class="card-title">Supply Requisition</h3>
         <p class="card-description">Request items and track approvals. Managers can approve, reject, or monitor all requests in real-time.</p>
-        <button onclick="showRequestTypeModal()" class="card-button">Access</button>
+        <button type="button" onclick="showRequestTypeModal()" class="card-button">Access</button>
       </div>
 
       <div class="menu-card">
@@ -659,7 +675,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         </div>
         <h3 class="card-title">Property Requisition</h3>
         <p class="card-description">Request property items and track approvals. Choose between consumable and non-consumable items.</p>
-        <button onclick="showPropertyRequestTypeModal()" class="card-button">Access</button>
+        <button type="button" onclick="showPropertyRequestTypeModal()" class="card-button">Access</button>
       </div>
 
     <?php elseif ($user_type === 'immediatehead' || strpos($user_type, 'immediatehead') === 0): ?>
@@ -946,7 +962,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         </div>
         <h3 class="card-title">Supply Requisition</h3>
         <p class="card-description">Request items and track approvals. Managers can approve, reject, or monitor all requests in real-time.</p>
-        <button onclick="showRequestTypeModal()" class="card-button">Access</button>
+        <button type="button" onclick="showRequestTypeModal()" class="card-button">Access</button>
       </div>
 
       <!-- Property Requisition Card -->
@@ -956,7 +972,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         </div>
         <h3 class="card-title">Property Requisition</h3>
         <p class="card-description">Request property items and track approvals. Choose between consumable and non-consumable items.</p>
-        <button onclick="showPropertyRequestTypeModal()" class="card-button">Access</button>
+        <button type="button" onclick="showPropertyRequestTypeModal()" class="card-button">Access</button>
       </div>
 
       <?php if (in_array($user_type, ['admin', 'administrator'])): ?>
@@ -1163,11 +1179,11 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         </div>
         <h3 class="card-title">System Settings</h3>
         <p class="card-description">Manage system settings and user preferences. Administrative access required.</p>
-        <button onclick="showPasswordModal()" class="card-button">Access Settings</button>
+        <button type="button" onclick="showPasswordModal()" class="card-button">Access Settings</button>
       </div>
     <?php endif; ?>
 
-    <!-- My Profile Card — visible to ALL users -->
+    <!-- My Profile Card â€” visible to ALL users -->
     <?php
     $db_user_id = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
     $profile_row = null;
@@ -1213,7 +1229,7 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
       ?>
       <h2>Welcome, <?= htmlspecialchars($titlePrefix . $firstName) ?>!</h2>
       <p class="text-center">You have successfully logged in to DCC-DARTS.</p>
-      <button class="btn btn-success" onclick="closeModal()">Close</button>
+      <button type="button" class="btn btn-success" onclick="closeModal()">Close</button>
     </div>
   </div>
   <?php unset($_SESSION['show_login_modal']); ?>
@@ -1345,8 +1361,12 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     if (modal) modal.style.display = 'none';
   }
 
-  // Auto-close after 5 seconds
-  setTimeout(closeModal, 5000);
+  // Only auto-dismiss when the welcome modal is actually on the page. This used to
+  // run unconditionally, so an unrelated timer fired on every dashboard load.
+  const welcomeModal = document.getElementById('loginSuccessModal');
+  if (welcomeModal) {
+    setTimeout(closeModal, 5000);
+  }
 
   // Property Request Type Modal Functions
   function showPropertyRequestTypeModal() {
@@ -1428,18 +1448,23 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     document.body.style.overflow = 'auto';
   }
 
-  // Close modals when clicking outside
-  window.onclick = function(event) {
-    var requestModal = document.getElementById('propertyRequestTypeModal');
-    var passwordModal = document.getElementById('passwordModal');
+  // Close modals when clicking outside.
+  // A single delegated listener covers every modal. The page previously assigned
+  // window.onclick twice, so the second assignment silently replaced the first and
+  // the property-request modal lost its outside-click-to-close behaviour.
+  const dismissMap = {
+    propertyRequestTypeModal: hidePropertyRequestTypeModal,
+    requestTypeModal: hideRequestTypeModal,
+    passwordModal: hidePasswordModal
+  };
 
-    if (event.target == requestModal) {
-      hidePropertyRequestTypeModal();
-    }
-    if (event.target == passwordModal) {
-      hidePasswordModal();
-    }
-  }
+  document.addEventListener('click', function(event) {
+    Object.keys(dismissMap).forEach(function(id) {
+      if (event.target === document.getElementById(id)) {
+        dismissMap[id]();
+      }
+    });
+  });
 
   // Close modals with Escape key
   document.addEventListener('keydown', function(event) {
@@ -1480,18 +1505,8 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     document.body.style.overflow = 'auto';
   }
 
-  // Close modals when clicking outside
-  window.onclick = function(event) {
-    var requestModal = document.getElementById('requestTypeModal');
-    var passwordModal = document.getElementById('passwordModal');
-
-    if (event.target == requestModal) {
-      hideRequestTypeModal();
-    }
-    if (event.target == passwordModal) {
-      hidePasswordModal();
-    }
-  }
+  // Close modals when clicking outside is handled by the single delegated
+  // listener defined above, which covers all three modals.
 
   // Close modals with Escape key
   document.addEventListener('keydown', function(event) {
@@ -1501,15 +1516,48 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
     }
   });
 
-  // Add smooth scrolling
+  // Number the cards so the CSS stagger (animation-delay: calc(var(--i) * ...))
+  // works for however many cards this role renders. The previous nth-child rules
+  // only covered 10, so cards beyond that animated out of order.
+  // --i is also capped in effect by the small per-card step, so long lists still
+  // finish quickly rather than trickling in for several seconds.
+  document.querySelectorAll('.menu-grid > .menu-card').forEach((card, i) => {
+    card.style.setProperty('--i', i);
+  });
+
+  // Smooth scrolling for in-page anchors.
+  // Guard against an empty/invalid href: document.querySelector('#') throws a
+  // SyntaxError, and href="#" is used by the navbar brand link.
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function(e) {
+      const hash = this.getAttribute('href');
+      if (!hash || hash === '#') {
+        e.preventDefault();
+        return;
+      }
+      const target = document.querySelector(hash);
+      if (!target) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
-      document.querySelector(this.getAttribute('href')).scrollIntoView({
+      target.scrollIntoView({
         behavior: 'smooth'
       });
     });
   });
+
+  // Safety net: a stray Enter key press inside the admin password field must never
+  // submit the form. Only the explicit "Access Settings" button may do that.
+  const adminPasswordForm = document.getElementById('passwordForm');
+  if (adminPasswordForm) {
+    adminPasswordForm.addEventListener('submit', function(e) {
+      if (e.submitter && e.submitter.type === 'submit') {
+        return; // intended submission
+      }
+      e.preventDefault();
+    });
+  }
 
   // Add click animation to request options
   document.addEventListener('DOMContentLoaded', function() {
