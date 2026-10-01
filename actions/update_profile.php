@@ -36,8 +36,34 @@ if ($tab === 'account') {
         exit;
     }
 
+    // Login (index.php) authenticates against `user`, but this file previously
+    // only knew about `employees`. Resolve which table actually holds this account
+    // first, so the uniqueness check and the UPDATE both target the same rows the
+    // user logs in with. On a deployment where `user` is a real table this matters.
+    $user_table = null;
+    foreach (['user', 'employees'] as $candidate) {
+        $probe = $conn->prepare("SELECT id FROM `{$candidate}` WHERE id = ? LIMIT 1");
+        if (!$probe) {
+            continue;
+        }
+        $probe->bind_param("i", $user_id);
+        $probe->execute();
+        $found = $probe->get_result()->fetch_assoc();
+        $probe->close();
+        if ($found) {
+            $user_table = $candidate;
+            break;
+        }
+    }
+
+    if ($user_table === null) {
+        $_SESSION['profile_error'] = 'Your account could not be found. Please log in again.';
+        header('Location: ../pages/profile.php');
+        exit;
+    }
+
     // Check username uniqueness (excluding self)
-    $check = $conn->prepare("SELECT id FROM employees WHERE username = ? AND id != ?");
+    $check = $conn->prepare("SELECT id FROM `{$user_table}` WHERE username = ? AND id != ?");
     $check->bind_param("si", $username, $user_id);
     $check->execute();
     $check->store_result();
@@ -68,7 +94,7 @@ if ($tab === 'account') {
         }
 
         // Verify current password
-        $pw_check = $conn->prepare("SELECT password FROM employees WHERE id = ?");
+        $pw_check = $conn->prepare("SELECT password FROM `{$user_table}` WHERE id = ?");
         $pw_check->bind_param("i", $user_id);
         $pw_check->execute();
         $pw_check->bind_result($hashed);
@@ -83,11 +109,11 @@ if ($tab === 'account') {
 
         $new_hashed = password_hash($new_password, PASSWORD_BCRYPT);
 
-        $stmt = $conn->prepare("UPDATE employees SET username = ?, password = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE `{$user_table}` SET username = ?, password = ? WHERE id = ?");
         $stmt->bind_param("ssi", $username, $new_hashed, $user_id);
     } else {
         // Only update username
-        $stmt = $conn->prepare("UPDATE employees SET username = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE `{$user_table}` SET username = ? WHERE id = ?");
         $stmt->bind_param("si", $username, $user_id);
     }
 
