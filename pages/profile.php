@@ -517,13 +517,19 @@ unset($_SESSION['profile_success'], $_SESSION['profile_error']);
                     </div>
                 </div>
             </div>
-
-            <!-- Actions -->
-            <div class="d-flex justify-content-end gap-3">
-                <a href="../dashboard.php" class="btn btn-cancel"><i class="fas fa-times me-2"></i>Cancel</a>
-                <button type="submit" class="btn btn-save"><i class="fas fa-shield-alt me-2"></i>Update Account</button>
-            </div>
         </form>
+
+        <!-- Cancel deliberately lives OUTSIDE <form>. While it was an <a> nested inside
+             the form, browsers could fold its activation into the form's submit behaviour,
+             which POSTed to update_profile.php instead of simply navigating away.
+             The submit button uses form="form-account" so it still posts correctly. -->
+        <div class="d-flex justify-content-end gap-3 mt-3">
+            <button type="button" class="btn btn-cancel"
+                    onclick="window.location.href='../dashboard.php'">
+                <i class="fas fa-times me-2"></i>Cancel
+            </button>
+            <button type="submit" class="btn btn-save" form="form-account"><i class="fas fa-shield-alt me-2"></i>Update Account</button>
+        </div>
     </div>
 
 </div><!-- end .profile-wrapper -->
