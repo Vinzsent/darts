@@ -21,7 +21,7 @@ function updateDarkModeButton() {
     const darkModeBtn = document.getElementById('darkModeToggle');
     if (darkModeBtn) {
         const isDark = localStorage.getItem('darkMode') === 'enabled';
-        darkModeBtn.innerHTML = isDark ? '☀️' : '🌙';
+        darkModeBtn.innerHTML = isDark ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
         darkModeBtn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
     }
 }

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Calculate the path prefix based on the current script location
 // This ensures links work from both the root and the /pages/ directory
 $current_script = $_SERVER['SCRIPT_NAME'];
@@ -39,8 +39,8 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false) ? '../' : './';
       </div>
     </div>
 
-    <button type="button" id="darkModeToggle" onclick="toggleDarkMode()" class="btn btn-outline-light me-2" aria-label="Toggle dark mode">ðŸŒ™</button>
-    <a href="<?= $path_prefix ?>logout.php" class="btn btn-outline-light">ðŸ”“ Logout</a>
+    <button type="button" id="darkModeToggle" onclick="toggleDarkMode()" class="btn btn-outline-light me-2" aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+    <a href="<?= $path_prefix ?>logout.php" class="btn btn-outline-light"><i class="fas fa-sign-out-alt me-1"></i>Logout</a>
   </div>
 </nav>
 
