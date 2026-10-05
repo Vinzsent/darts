@@ -27,7 +27,7 @@ $sy_inv_raw = $_GET['sy_inv'] ?? '';
 
 // Build WHERE conditions
 $where_conditions = [];
-$where_conditions[] = "pi.receiver = 'Property Custodian'";
+$where_conditions[] = "(pi.receiver = 'Property Custodian' OR pi.receiver LIKE '%Property Custodian%')";
 
 // Add search filter
 if (!empty($search_term)) {

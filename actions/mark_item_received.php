@@ -76,7 +76,26 @@ if ($stmt->execute()) {
     if (!function_exists('po_post_item_to_inventory')) {
         require_once __DIR__ . '/../includes/po_inventory_helper.php';
     }
-    $stock = po_post_item_to_inventory($conn, $po, $item, $target, $user_id);
+    $stock = po_post_item_to_inventory($conn, $po, $item, $target, $user_id, $received_date);
+
+    // If all items on this PO are now received, update the PO status to Received
+    $chk_po = $conn->prepare("SELECT COUNT(*) AS total_items, SUM(CASE WHEN is_received = 1 THEN 1 ELSE 0 END) AS received_items FROM purchase_order_items WHERE po_id = ?");
+    if ($chk_po) {
+        $chk_po->bind_param("i", $item['po_id']);
+        $chk_po->execute();
+        $po_counts = $chk_po->get_result()->fetch_assoc();
+        $chk_po->close();
+
+        if ($po_counts && (int)$po_counts['total_items'] > 0 && (int)$po_counts['total_items'] === (int)$po_counts['received_items']) {
+            $upd_po = $conn->prepare("UPDATE purchase_orders SET status = 'Received', received_by = COALESCE(NULLIF(received_by, ''), ?), received_date = COALESCE(NULLIF(received_date, ''), ?) WHERE po_id = ?");
+            if ($upd_po) {
+                $uid_str = (string)($user_id ?? 0);
+                $upd_po->bind_param("ssi", $uid_str, $received_date, $item['po_id']);
+                $upd_po->execute();
+                $upd_po->close();
+            }
+        }
+    }
 
     echo json_encode([
         'success' => true,

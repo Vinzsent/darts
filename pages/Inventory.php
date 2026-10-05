@@ -50,10 +50,10 @@ $inv_where_conditions = [];
 $recv_where_conditions = [];
 $logs_where_conditions = [];
 
-// Add receiver filter for Supply In-charge
-$inv_where_conditions[] = "i.receiver = 'Supply In-charge'";
-$recv_where_conditions[] = "st.receiver = 'Supply In-charge'";
-$logs_where_conditions[] = "sl.receiver = 'Supply In-charge'";
+// Add receiver filter for Supply In-charge (supports both legacy role and name/role format)
+$inv_where_conditions[] = "(i.receiver = 'Supply In-charge' OR i.receiver LIKE '%Supply In-charge%')";
+$recv_where_conditions[] = "(st.receiver = 'Supply In-charge' OR st.receiver LIKE '%Supply In-charge%')";
+$logs_where_conditions[] = "(sl.receiver = 'Supply In-charge' OR sl.receiver LIKE '%Supply In-charge%')";
 
 // Add search filter if search term is provided
 if (!empty($search_term)) {
@@ -2698,7 +2698,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
             // Rebuild WHERE conditions for AJAX
             $inv_where_conditions_ajax = [];
-            $inv_where_conditions_ajax[] = "i.receiver = 'Supply In-charge'";
+            $inv_where_conditions_ajax[] = "(i.receiver = 'Supply In-charge' OR i.receiver LIKE '%Supply In-charge%')";
 
             if (!empty($search_term_ajax)) {
                 $search_escaped_ajax = $conn->real_escape_string($search_term_ajax);

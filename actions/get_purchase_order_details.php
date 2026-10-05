@@ -20,12 +20,16 @@ try {
 
     if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
         $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '')";
+        $receiver_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', ru.first_name, ru.last_name)), '')";
     } elseif (in_array('firstname', $user_cols, true) && in_array('lastname', $user_cols, true)) {
         $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.firstname, u.lastname)), '')";
+        $receiver_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', ru.firstname, ru.lastname)), '')";
     } elseif (in_array('name', $user_cols, true)) {
         $user_name_expr = "NULLIF(TRIM(u.name), '')";
+        $receiver_name_expr = "NULLIF(TRIM(ru.name), '')";
     } else {
         $user_name_expr = "NULLIF(TRIM(u.username), '')";
+        $receiver_name_expr = "NULLIF(TRIM(ru.username), '')";
     }
     $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 
@@ -44,12 +48,17 @@ try {
             p.total_amount,
             p.status,
             p.notes,
+            p.received_by,
+            p.received_date,
             p.received_notes,
             p.created_at,
             p.updated_at,
-            $created_by_expr as created_by_name
+            $created_by_expr as created_by_name,
+            COALESCE($receiver_name_expr, ru.username, NULLIF(p.received_by, ''), 'Unknown') as receiver_name,
+            ru.user_type as receiver_role
         FROM purchase_orders p
         LEFT JOIN `user` u ON p.created_by = u.id
+        LEFT JOIN `user` ru ON CAST(p.received_by AS UNSIGNED) = ru.id
         WHERE p.po_id = ?
     ";
     

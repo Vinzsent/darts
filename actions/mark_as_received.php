@@ -122,7 +122,7 @@ if ($mark_all_items) {
     }
     $po_row = ['po_id' => $po_id, 'po_number' => $po_number];
     foreach ($pending_items as $pi) {
-        $r = po_post_item_to_inventory($conn, $po_row, $pi, $target, $received_by);
+        $r = po_post_item_to_inventory($conn, $po_row, $pi, $target, $received_by, $received_date);
         $r['item_description'] = $pi['item_description'];
         $stock_results[] = $r;
     }

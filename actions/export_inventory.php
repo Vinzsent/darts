@@ -31,7 +31,7 @@ $sql = "SELECT
                 ELSE 'In Stock'
             END as stock_status
         FROM inventory i 
-        WHERE i.receiver = 'Supply In-charge'
+        WHERE (i.receiver = 'Supply In-charge' OR i.receiver LIKE '%Supply In-charge%')
         ORDER BY i.item_name ASC";
 
 $result = $conn->query($sql);

@@ -50,10 +50,10 @@ $inv_where_conditions = [];
 $recv_where_conditions = [];
 $logs_where_conditions = [];
 
-// Add receiver filter for Property Custodian (use alias 'i' to match later queries)
-$inv_where_conditions[] = "i.receiver = 'Property Custodian'";
-$recv_where_conditions[] = "st.receiver = 'Property Custodian'";
-$logs_where_conditions[] = "sl.receiver = 'Property Custodian'";
+// Add receiver filter for Property Custodian (supports both legacy role and name/role format)
+$inv_where_conditions[] = "(i.receiver = 'Property Custodian' OR i.receiver LIKE '%Property Custodian%')";
+$recv_where_conditions[] = "(st.receiver = 'Property Custodian' OR st.receiver LIKE '%Property Custodian%')";
+$logs_where_conditions[] = "(sl.receiver = 'Property Custodian' OR sl.receiver LIKE '%Property Custodian%')";
 
 // Add search filter if search term is provided
 if (!empty($search_term)) {
@@ -3139,7 +3139,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
             // Rebuild WHERE conditions for AJAX
             $inv_where_conditions_ajax = [];
-            $inv_where_conditions_ajax[] = "pi.receiver = 'Property Custodian'";
+            $inv_where_conditions_ajax[] = "(pi.receiver = 'Property Custodian' OR pi.receiver LIKE '%Property Custodian%')";
 
             if (!empty($search_term_ajax)) {
                 $search_escaped_ajax = $conn->real_escape_string($search_term_ajax);

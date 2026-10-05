@@ -148,10 +148,82 @@ function po_resolve_target_for_role($user_type, $requested = null)
 }
 
 /**
+ * Build a descriptive receiver string containing the receiver's full name and role.
+ * e.g. "Juan Dela Cruz (Property Custodian)"
+ */
+function po_build_receiver_string($conn, $user_id = null, $target = 'supply')
+{
+    $name = '';
+    $role = '';
+
+    if (!empty($_SESSION['user']) && is_array($_SESSION['user'])) {
+        $u = $_SESSION['user'];
+        $first = trim((string)($u['first_name'] ?? ''));
+        $middle = trim((string)($u['middle_name'] ?? ''));
+        $last = trim((string)($u['last_name'] ?? ''));
+        $parts = array_filter([$first]);
+        if ($middle !== '') {
+            $parts[] = strtoupper(substr($middle, 0, 1)) . '.';
+        }
+        if ($last !== '') {
+            $parts[] = $last;
+        }
+        $name = trim(implode(' ', array_filter($parts)));
+        if ($name === '') {
+            $name = trim((string)($u['name'] ?? $u['username'] ?? ''));
+        }
+        $role = trim((string)($u['user_type'] ?? $_SESSION['user_type'] ?? ''));
+    }
+
+    if ($name === '' && $user_id) {
+        $stmt = $conn->prepare("SELECT first_name, middle_name, last_name, username, user_type FROM `user` WHERE id = ? LIMIT 1");
+        if ($stmt) {
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($res && $row = $res->fetch_assoc()) {
+                $first = trim((string)($row['first_name'] ?? ''));
+                $middle = trim((string)($row['middle_name'] ?? ''));
+                $last = trim((string)($row['last_name'] ?? ''));
+                $parts = array_filter([$first]);
+                if ($middle !== '') {
+                    $parts[] = strtoupper(substr($middle, 0, 1)) . '.';
+                }
+                if ($last !== '') {
+                    $parts[] = $last;
+                }
+                $name = trim(implode(' ', array_filter($parts)));
+                if ($name === '') {
+                    $name = trim((string)($row['username'] ?? ''));
+                }
+                if ($role === '') {
+                    $role = trim((string)($row['user_type'] ?? ''));
+                }
+            }
+            $stmt->close();
+        }
+    }
+
+    $target_role = ($target === 'property') ? 'Property Custodian' : 'Supply In-charge';
+    if ($role === '') {
+        $role = $target_role;
+    }
+    if ($name === '') {
+        $name = $role;
+    }
+
+    if (strcasecmp($role, $target_role) !== 0 && stripos($role, $target_role) === false) {
+        return "{$name} ({$role} - {$target_role})";
+    }
+
+    return "{$name} ({$role})";
+}
+
+/**
  * Record the movement in the relevant stock log table.
  * Failures here are non-fatal: stock is already updated.
  */
-function po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new, $notes, $user_id)
+function po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new, $notes, $user_id, $receiver = '')
 {
     $log_table = ($table === 'property_inventory') ? 'property_stock_logs' : 'stock_logs';
     $chk = $conn->query("SHOW TABLES LIKE '{$log_table}'");
@@ -159,8 +231,8 @@ function po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new, $notes, $
         return;
     }
 
-    $sql = "INSERT INTO `{$log_table}` (inventory_id, movement_type, quantity, previous_stock, new_stock, notes, created_by)
-            VALUES (?, 'IN', ?, ?, ?, ?, ?)";
+    $sql = "INSERT INTO `{$log_table}` (inventory_id, movement_type, quantity, previous_stock, new_stock, notes, created_by, receiver)
+            VALUES (?, 'IN', ?, ?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         return;
@@ -172,7 +244,8 @@ function po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new, $notes, $
     $p_prev = (int)$prev;
     $p_new  = (int)$new;
     $p_uid  = $user_id ? (int)$user_id : 0;
-    $stmt->bind_param('iiiisi', $p_inv, $p_qty, $p_prev, $p_new, $notes, $p_uid);
+    $p_rec  = (string)$receiver;
+    $stmt->bind_param('iiiisis', $p_inv, $p_qty, $p_prev, $p_new, $notes, $p_uid, $p_rec);
     $stmt->execute();
     $stmt->close();
 }
@@ -217,7 +290,7 @@ function po_record_item_link($conn, $table, $inventory_id, $poi_id, $po_id, $ite
  *
  * @return array ['status' => 'created'|'incremented'|'skipped'|'error', 'message'=>string, ...]
  */
-function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_id = null)
+function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_id = null, $received_date = null)
 {
     $table = po_resolve_inventory_table($target);
     $poi_id = (int)$item['poi_id'];
@@ -225,6 +298,9 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     $desc   = trim((string)$item['item_description']);
     $qty    = (int)round((float)$item['quantity']);
     $unit_cost = (float)$item['unit_cost'];
+    if (empty($received_date)) {
+        $received_date = date('Y-m-d H:i:s');
+    }
 
     if ($poi_id <= 0 || $desc === '') {
         return ['status' => 'error', 'message' => 'Missing PO line data.'];
@@ -294,16 +370,15 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         $prev   = (int)$match['current_stock'];
         $new    = $prev + $qty;
 
-        // Backfill receiver too — a matched row created before this fix may have
-        // a NULL receiver and would stay hidden behind the page's receiver filter.
-        $receiver_label = ($table === 'property_inventory') ? 'Property Custodian' : 'Supply In-charge';
-        // Do NOT overwrite source_poi_id here: it is UNIQUE and already belongs to
-        // the row's first PO line. This line is tracked in po_item_inventory_links.
-        $upd = $conn->prepare("UPDATE `{$table}` SET current_stock = ?, receiver = COALESCE(NULLIF(receiver, ''), ?) WHERE inventory_id = ?");
+        $receiver_str = po_build_receiver_string($conn, $user_id, $target);
+        $p_user_id = $user_id ? (int)$user_id : null;
+
+        // Update stock, receiver name/role, date_received, and audit columns.
+        $upd = $conn->prepare("UPDATE `{$table}` SET current_stock = ?, receiver = ?, date_received = ?, last_updated_by = ?, date_updated = NOW() WHERE inventory_id = ?");
         if (!$upd) {
             return ['status' => 'error', 'message' => 'DB error: ' . $conn->error];
         }
-        $upd->bind_param('isi', $new, $receiver_label, $inv_id);
+        $upd->bind_param('issii', $new, $receiver_str, $received_date, $p_user_id, $inv_id);
         if (!$upd->execute()) {
             $msg = 'DB error: ' . $upd->error;
             $upd->close();
@@ -314,31 +389,29 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         po_record_item_link($conn, $table, $inv_id, $poi_id, $po_id, $desc, $qty);
 
         po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new,
-            "Received from PO {$po_number} ({$match['match']} match)", $user_id);
+            "Received from PO {$po_number} ({$match['match']} match)", $user_id, $receiver_str);
 
         return ['status' => 'incremented', 'inventory_id' => $inv_id,
                 'previous_stock' => $prev, 'new_stock' => $new, 'match' => $match['match'],
                 'message' => "Added {$qty} to existing inventory item."];
     }
 
-    // No confident match — create a new row so the item is at least findable.
+    // No confident match — create a new row with receiver name/role and date_received.
     $category = po_default_category($table);
-    // `receiver` matters: property_inventory.php filters on
-    // receiver = 'Property Custodian', so a row posted without it would be invisible.
-    $receiver_label = ($table === 'property_inventory') ? 'Property Custodian' : 'Supply In-charge';
-    // PO lines carry no brand, and a NULL brand triggers "Passing null to
-    // htmlspecialchars()" deprecation warnings wherever the row is displayed.
+    $receiver_str = po_build_receiver_string($conn, $user_id, $target);
     $brand_label = 'N/A';
+    $p_user_id = $user_id ? (int)$user_id : null;
+
     $ins = $conn->prepare(
-        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, brand, status, receiver, source_po_id, source_poi_id, date_created)
-         VALUES (?, ?, ?, ?, 'pcs', ?, ?, 'Active', ?, ?, ?, NOW())"
+        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, brand, status, receiver, source_po_id, source_poi_id, date_created, date_received, created_by)
+         VALUES (?, ?, ?, ?, 'pcs', ?, ?, 'Active', ?, ?, ?, NOW(), ?, ?)"
     );
     if (!$ins) {
         return ['status' => 'error', 'message' => 'DB error: ' . $conn->error];
     }
     // Placeholders in order: item_name, category, current_stock, quantity,
-    // unit_cost, brand, receiver, source_po_id, source_poi_id -> "ss"+"ii"+"d"+"s"+"s"+"ii"
-    $ins->bind_param('ssiidssii', $desc, $category, $qty, $qty, $unit_cost, $brand_label, $receiver_label, $po_id, $poi_id);
+    // unit_cost, brand, receiver, source_po_id, source_poi_id, date_received, created_by -> "ss"+"ii"+"d"+"s"+"s"+"ii"+"s"+"i"
+    $ins->bind_param('ssiidssiisi', $desc, $category, $qty, $qty, $unit_cost, $brand_label, $receiver_str, $po_id, $poi_id, $received_date, $p_user_id);
     if (!$ins->execute()) {
         $msg = 'DB error: ' . $ins->error;
         $ins->close();
@@ -350,7 +423,7 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     po_record_item_link($conn, $table, $new_id, $poi_id, $po_id, $desc, $qty);
 
     po_write_stock_log($conn, $table, $new_id, $qty, 0, $qty,
-        "Received from PO {$po_number} (new item)", $user_id);
+        "Received from PO {$po_number} (new item)", $user_id, $receiver_str);
 
     return ['status' => 'created', 'inventory_id' => $new_id, 'new_stock' => $qty,
             'message' => 'Created new inventory item from received PO line.'];

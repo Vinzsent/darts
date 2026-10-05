@@ -44,12 +44,16 @@ while ($u_res && $c = $u_res->fetch_assoc()) {
 
 if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
     $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '')";
+    $receiver_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', ru.first_name, ru.last_name)), '')";
 } elseif (in_array('firstname', $user_cols, true) && in_array('lastname', $user_cols, true)) {
     $user_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', u.firstname, u.lastname)), '')";
+    $receiver_name_expr = "NULLIF(TRIM(CONCAT_WS(' ', ru.firstname, ru.lastname)), '')";
 } elseif (in_array('name', $user_cols, true)) {
     $user_name_expr = "NULLIF(TRIM(u.name), '')";
+    $receiver_name_expr = "NULLIF(TRIM(ru.name), '')";
 } else {
     $user_name_expr = "NULLIF(TRIM(u.username), '')";
+    $receiver_name_expr = "NULLIF(TRIM(ru.username), '')";
 }
 $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 
@@ -67,11 +71,17 @@ $po_query = "
         p.status,
         p.notes,
         p.created_at,
+        p.received_date,
+        p.received_by,
+        p.received_notes,
         $created_by_expr as created_by_name,
+        MAX(COALESCE($receiver_name_expr, ru.username, NULLIF(p.received_by, ''), '')) as received_by_name,
+        MAX(COALESCE(ru.user_type, '')) as received_by_role,
         COUNT(poi.poi_id) as item_count,
         SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) as received_item_count
     FROM purchase_orders p
     LEFT JOIN `user` u ON p.created_by = u.id
+    LEFT JOIN `user` ru ON CAST(p.received_by AS UNSIGNED) = ru.id
     LEFT JOIN purchase_order_items poi ON p.po_id = poi.po_id
     WHERE (
         ? = ''
@@ -83,7 +93,8 @@ $po_query = "
         )
     )
     GROUP BY p.po_id, p.po_number, p.po_date, p.supplier_name, p.supplier_address,
-             p.total_amount, p.status, p.notes, p.created_at, $created_by_expr
+             p.total_amount, p.status, p.notes, p.created_at, p.received_date, p.received_by, p.received_notes,
+             $created_by_expr
     ORDER BY
         -- Items already received (e.g. by the property custodian) come first,
         -- fully-received POs ahead of partially-received ones, then newest.
@@ -93,6 +104,9 @@ $po_query = "
 ";
 
 $po_stmt = $conn->prepare($po_query);
+if (!$po_stmt) {
+    die("Database error preparing query: " . $conn->error);
+}
 $like = '%' . $search_term . '%';
 $po_stmt->bind_param("ssss", $search_term, $like, $like, $like);
 $po_stmt->execute();
@@ -100,7 +114,7 @@ $po_result = $po_stmt->get_result();
 
 // Items grouped by PO (for the click-to-expand sub-rows)
 $items_map = [];
-$items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, unit_cost, line_total FROM purchase_order_items ORDER BY po_id, item_number ASC");
+$items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, received_date FROM purchase_order_items ORDER BY po_id, item_number ASC");
 if ($items_result) {
     while ($it = $items_result->fetch_assoc()) {
         $items_map[$it['po_id']][] = $it;
@@ -390,10 +404,15 @@ $verifier_name = 'Marilou L. Suarez';
 
     /* Status Badges & Items Badge */
     .status-badge,
-    .badge,
+    .badge:not(.bg-light):not(.bg-white),
     .badge-info {
         color: #ffffff !important;
         -webkit-text-fill-color: #ffffff !important;
+    }
+
+    .badge.bg-light {
+        color: #212529 !important;
+        -webkit-text-fill-color: #212529 !important;
     }
 
     .status-badge {
@@ -655,6 +674,17 @@ $verifier_name = 'Marilou L. Suarez';
                                 </span>
                                 <br>
                                 <small class="text-muted"><?= $recv_label ?></small>
+                                <?php if (!empty($po['received_by_name'])): ?>
+                                    <div class="mt-1" style="font-size: 0.75rem; color: #155724; line-height: 1.2;">
+                                        <i class="fas fa-user-check"></i> <strong><?= htmlspecialchars($po['received_by_name']) ?></strong>
+                                        <?php if (!empty($po['received_by_role'])): ?>
+                                            <br><span style="color: #374151;">(<?= htmlspecialchars($po['received_by_role']) ?>)</span>
+                                        <?php endif; ?>
+                                        <?php if (!empty($po['received_date'])): ?>
+                                            <br><span style="color: #374151;"><?= date('M d, Y', strtotime($po['received_date'])) ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="status-badge status-<?= strtolower($po['status']) ?>">
@@ -693,6 +723,7 @@ $verifier_name = 'Marilou L. Suarez';
                                                 <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 90px;">Quantity</th>
                                                 <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 120px;">Unit Cost</th>
                                                 <th style="text-align: right; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 130px;">Line Total</th>
+                                                <th style="text-align: center; padding: 6px 10px; border-bottom: 2px solid var(--primary-green); width: 140px;">Received Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -705,11 +736,22 @@ $verifier_name = 'Marilou L. Suarez';
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;"><?= htmlspecialchars($ritem['quantity']) ?></td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['unit_cost'], 2) ?></td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['line_total'], 2) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: center;">
+                                                        <?php if ((int)($ritem['is_received'] ?? 0) === 1): ?>
+                                                            <span class="badge bg-success" style="font-size:0.75rem;"><i class="fas fa-check"></i> Received</span>
+                                                            <?php if (!empty($ritem['received_date'])): ?>
+                                                                <br><small style="color: #374151; font-size: 0.75rem;"><?= date('M d, Y', strtotime($ritem['received_date'])) ?></small>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary" style="font-size:0.75rem;">Pending</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                 </tr>
                                             <?php endforeach; ?>
                                             <tr>
                                                 <td colspan="4" style="padding: 8px 10px; text-align: right; font-weight: bold; color: var(--primary-green);">SUBTOTAL:</td>
                                                 <td style="padding: 8px 10px; text-align: right; font-weight: bold; color: var(--primary-green);">₱<?= number_format($sub_total, 2) ?></td>
+                                                <td></td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -811,6 +853,8 @@ $verifier_name = 'Marilou L. Suarez';
         let grandTotal = 0;
 
         items.forEach(item => {
+            const isRecv = parseInt(item.is_received) === 1;
+            const recvDateStr = item.received_date ? new Date(item.received_date).toLocaleDateString() : '';
             itemsHtml += `
                 <tr>
                     <td>${item.item_number}</td>
@@ -818,8 +862,9 @@ $verifier_name = 'Marilou L. Suarez';
                     <td>${item.quantity}</td>
                     <td>₱${parseFloat(item.unit_cost).toFixed(2)}</td>
                     <td>₱${parseFloat(item.line_total).toFixed(2)}</td>
+                    <td>${recvDateStr ? `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e9ecef;color:#212529;font-size:0.82rem;border:1px solid #ced4da;">${recvDateStr}</span>` : '<span style="color:#6c757d;font-size:0.85rem;">Not received</span>'}</td>
                     <td>
-                        ${parseInt(item.is_received) === 1 ? `
+                        ${isRecv ? `
                             <span class="badge bg-success"><i class="fas fa-check"></i> Already Received</span>
                         ` : `
                             <button class="btn btn-success btn-sm" onclick="markItemReceived(${item.poi_id}, this)">
@@ -841,6 +886,10 @@ $verifier_name = 'Marilou L. Suarez';
                         <p><strong>Date:</strong> ${new Date(po.po_date).toLocaleDateString()}</p>
                         <p><strong>Status:</strong> <span class="status-badge status-${po.status.toLowerCase()}">${po.status}</span></p>
                         <p><strong>Payment Method:</strong> ${po.payment_method || 'N/A'}</p>
+                        ${po.status === 'Received' || po.received_date ? `
+                            <p><strong>Received Date:</strong> ${po.received_date ? new Date(po.received_date).toLocaleString() : 'N/A'}</p>
+                            <p><strong>Received By:</strong> ${po.receiver_name ? `${po.receiver_name} ${po.receiver_role ? `(${po.receiver_role})` : ''}` : (po.received_by || 'N/A')}</p>
+                        ` : ''}
                     </div>
                     <div class="col-md-6">
                         <h4>Supplier Information</h4>
@@ -860,6 +909,7 @@ $verifier_name = 'Marilou L. Suarez';
                             <th>Quantity</th>
                             <th>Unit Cost</th>
                             <th>Total</th>
+                            <th>Received Date</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -868,6 +918,7 @@ $verifier_name = 'Marilou L. Suarez';
                         <tr style="background-color: var(--primary-green); color: white; font-weight: bold;">
                             <td colspan="4" style="text-align: right;">GRAND TOTAL:</td>
                             <td>₱${grandTotal.toFixed(2)}</td>
+                            <td></td>
                             <td></td>
                         </tr>
                     </tbody>
