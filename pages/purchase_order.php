@@ -6,6 +6,7 @@ ini_set('display_errors', 1);
 $pageTitle = 'Purchase Order';
 include '../includes/auth.php';
 include '../includes/db.php';
+require_once __DIR__ . '/../includes/po_inventory_helper.php';
 include '../includes/header.php';
 
 $user_type = $_SESSION['user_type'] ?? '';
@@ -174,9 +175,17 @@ function savePurchaseOrder($data, $conn, $user_id)
                     $unit_cost = floatval($item['unit_cost'] ?? 0);
                     $line_total = $quantity * $unit_cost;
 
-                    $item_sql = "INSERT INTO purchase_order_items 
-                                (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                                VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
+                    // Route marker: 'supply' -> inventory, 'property' -> property_inventory.
+                    $location = po_normalize_location($item['location'] ?? '');
+                    $location_sql = $location === null ? 'NULL' : "'$location'";
+
+                    $item_sql = po_location_column_exists($conn)
+                        ? "INSERT INTO purchase_order_items
+                            (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
+                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total, $location_sql)"
+                        : "INSERT INTO purchase_order_items
+                            (po_id, item_number, item_description, quantity, unit_cost, line_total)
+                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
 
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
@@ -584,22 +593,24 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .po-table th {
-            background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+            background: var(--primary-green);
             color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
-            padding: 15px 10px;
+            padding: 20px 10px;
             text-align: center;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
             border: 1px solid var(--primary-green);
         }
 
         .po-table td {
-            padding: 12px 10px;
-            border: 1px solid #ddd;
+            padding: 18px 10px;
+            border: 1px solid #e9ecef;
             text-align: center;
             vertical-align: middle;
             color: var(--text-dark) !important;
@@ -630,7 +641,9 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
             background: transparent;
             width: 100%;
             text-align: center;
-            padding: 5px;
+            padding: 6px 4px;
+            font-size: 0.95rem;
+            color: var(--text-dark);
         }
 
         .po-table input:focus {
