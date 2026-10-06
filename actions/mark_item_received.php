@@ -27,8 +27,9 @@ if (!in_array($user_type, $allowed_roles)) {
     exit;
 }
 
-// Where the received goods belong is decided by the user's role, not the browser:
-// Supply In-charge -> inventory, Property Custodian -> property_inventory.
+// Where the received goods belong is decided by the location marked on each PO line
+// (supply -> inventory, property -> property_inventory). The receiver's role is only
+// the fallback for lines that were never marked.
 require_once __DIR__ . '/../includes/po_inventory_helper.php';
 $target = po_resolve_target_for_role($raw_user_type, $data['target'] ?? null);
 
@@ -37,8 +38,11 @@ $user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
 
 // Load the line first so it can be posted into inventory, and so we can tell
 // "already received" apart from "update matched 0 rows".
+// The location mark is optional (older databases may not have the column).
+$location_col_sql = po_location_column_exists($conn) ? ', location' : '';
+
 $item_stmt = $conn->prepare(
-    "SELECT poi_id, po_id, item_description, quantity, unit_cost
+    "SELECT poi_id, po_id, item_description, quantity, unit_cost{$location_col_sql}
      FROM purchase_order_items
      WHERE poi_id = ? AND is_received = 0
      LIMIT 1"
@@ -54,6 +58,16 @@ if (!$item_res || $item_res->num_rows === 0) {
 }
 $item = $item_res->fetch_assoc();
 $item_stmt->close();
+
+// Record where the stock actually went, so the line keeps an audit trail even
+// though the PO form no longer has a Location column. An existing mark is never
+// overwritten, and with no mark posted this is simply a no-op.
+if (empty($item['location'])) {
+    $posted_location = $data['location'] ?? '';
+    if (po_apply_location_to_item($conn, $poi_id, $posted_location)) {
+        $item['location'] = (string)po_normalize_location($posted_location);
+    }
+}
 
 $po_stmt = $conn->prepare("SELECT po_id, po_number FROM purchase_orders WHERE po_id = ?");
 $po_stmt->bind_param("i", $item['po_id']);
