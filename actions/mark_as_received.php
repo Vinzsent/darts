@@ -31,8 +31,9 @@ if (!in_array($user_type, $allowed_roles)) {
     exit;
 }
 
-// Where the received goods belong is decided by the user's role, not the browser:
-// Supply In-charge -> inventory, Property Custodian -> property_inventory.
+// Where the received goods belong is decided by the location marked on each PO line
+// (supply -> inventory, property -> property_inventory). The receiver's role is only
+// the fallback for lines that were never marked.
 require_once __DIR__ . '/../includes/po_inventory_helper.php';
 $target = po_resolve_target_for_role($raw_user_type, $data['target'] ?? null);
 
@@ -93,8 +94,11 @@ $stock_results = [];
 if ($mark_all_items) {
     // Capture the outstanding lines BEFORE the bulk UPDATE so we know exactly
     // which ones newly arrived and need posting (keeps re-runs idempotent).
+    // The location mark is optional (older databases may not have the column).
+    $location_col_sql = po_location_column_exists($conn) ? ', location' : '';
+
     $pending_stmt = $conn->prepare(
-        "SELECT poi_id, item_description, quantity, unit_cost
+        "SELECT poi_id, item_description, quantity, unit_cost{$location_col_sql}
          FROM purchase_order_items
          WHERE po_id = ? AND is_received = 0"
     );
@@ -107,6 +111,17 @@ if ($mark_all_items) {
             $pending_items[] = $pr;
         }
         $pending_stmt->close();
+    }
+
+    // Record where the stock actually went (audit trail only — the PO form has no
+    // Location column any more). Existing marks are never overwritten.
+    $posted_location = $data['location'] ?? '';
+    if ($posted_location !== '') {
+        foreach ($pending_items as $idx => $pi) {
+            if (empty($pi['location']) && po_apply_location_to_item($conn, $pi['poi_id'], $posted_location)) {
+                $pending_items[$idx]['location'] = (string)po_normalize_location($posted_location);
+            }
+        }
     }
 
     $item_stmt = $conn->prepare("UPDATE purchase_order_items SET is_received = 1, received_date = ? WHERE po_id = ? AND is_received = 0");
@@ -142,24 +157,38 @@ $stmt->bind_param("issi", $received_by, $received_date, $received_notes, $po_id)
 
 if ($stmt->execute()) {
     // Summarise what landed in inventory so the UI can report it.
+    // A single PO can mix supply and property lines, so count each bucket separately.
     $posted = 0;
     $created = 0;
+    $by_target = ['supply' => 0, 'property' => 0];
     foreach ($stock_results as $sr) {
+        $bucket = (($sr['target'] ?? $target) === 'property') ? 'property' : 'supply';
         if ($sr['status'] === 'incremented') {
             $posted++;
+            $by_target[$bucket]++;
         } elseif ($sr['status'] === 'created') {
             $created++;
+            $by_target[$bucket]++;
         }
     }
 
     $message = 'Purchase order marked as received successfully.';
     if ($mark_all_items && ($posted || $created)) {
-        $message .= sprintf(
-            ' %d item(s) added to %s inventory%s.',
-            $posted + $created,
-            $target === 'property' ? 'Property' : 'Supply',
-            $created > 0 ? sprintf(' (%d new item record(s) created)', $created) : ''
-        );
+        $parts = [];
+        if ($by_target['supply'] > 0) {
+            $parts[] = $by_target['supply'] . ' to Supply inventory';
+        }
+        if ($by_target['property'] > 0) {
+            $parts[] = $by_target['property'] . ' to Property inventory';
+        }
+        $message .= sprintf(' %d item(s) added', $posted + $created);
+        if ($parts) {
+            $message .= ': ' . implode(', ', $parts);
+        }
+        $message .= '.';
+        if ($created > 0) {
+            $message .= sprintf(' (%d new item record(s) created)', $created);
+        }
     }
 
     echo json_encode([
