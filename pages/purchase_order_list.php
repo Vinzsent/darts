@@ -825,6 +825,38 @@ $verifier_name = 'Marilou L. Suarez';
         }
     }
 
+    // Remember which office inventory the user picked from the dropdown.
+    // The details modal is rebuilt after every single-item receipt, and the whole
+    // page reloads after a full receipt, so without this the select silently
+    // snapped back to "Supply" and the next PO risked being filed to the wrong
+    // inventory. localStorage also survives that reload.
+    const STOCK_TARGET_KEY = 'po_stock_target';
+
+    function getSavedStockTarget() {
+        try {
+            const v = localStorage.getItem(STOCK_TARGET_KEY);
+            return (v === 'property' || v === 'supply') ? v : 'supply';
+        } catch (e) {
+            return 'supply'; // storage disabled (private mode) - fall back safely
+        }
+    }
+
+    function saveStockTarget(value) {
+        if (value !== 'property' && value !== 'supply') return;
+        try {
+            localStorage.setItem(STOCK_TARGET_KEY, value);
+        } catch (e) { }
+    }
+
+    // Re-apply the saved choice every time the modal content is rebuilt.
+    function restoreStockTargetSelect() {
+        const sel = document.getElementById('stockTargetSelect');
+        // Office roles get a hidden input fixed by their role - never override it.
+        if (sel && sel.tagName === 'SELECT') {
+            sel.value = getSavedStockTarget();
+        }
+    }
+
     // View purchase order details
     function viewPurchaseOrder(poId) {
         currentViewedPoId = poId;
@@ -939,7 +971,7 @@ $verifier_name = 'Marilou L. Suarez';
                             — set by your role (<?= htmlspecialchars($user_type) ?>).
                         </div>
                     <?php else: ?>
-                        <select class="form-select" id="stockTargetSelect">
+                        <select class="form-select" id="stockTargetSelect" onchange="saveStockTarget(this.value)">
                             <option value="supply">Supply Office Inventory</option>
                             <option value="property">Property Office Inventory</option>
                         </select>
@@ -954,6 +986,10 @@ $verifier_name = 'Marilou L. Suarez';
         `;
 
         document.getElementById('purchaseOrderDetailsContent').innerHTML = content;
+
+        // The freshly built markup always starts on the first option, so put the
+        // user's saved choice back before they read or submit anything.
+        restoreStockTargetSelect();
 
         // Footer button state is driven by the item-level Action column.
         // Once every line item is received there is nothing left to action, so the
