@@ -51,7 +51,7 @@ list($sy_logs_start, $sy_logs_end) = parse_school_year_range($sy_logs_raw);
 $logs_where_conditions = [];
 
 // Receiver filter for Property Custodian
-$logs_where_conditions[] = "sl.receiver = 'Property Custodian'";
+$logs_where_conditions[] = "(sl.receiver = 'Property Custodian' OR sl.receiver LIKE '%Property Custodian%')";
 
 // Add school year filter if provided
 if ($sy_logs_start && $sy_logs_end) {
