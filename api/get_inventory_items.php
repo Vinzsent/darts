@@ -26,7 +26,11 @@ try {
     $inv_where_conditions = [];
     
     // Add receiver filter for Supply In-charge
-    $inv_where_conditions[] = "i.receiver = 'Supply In-charge'";
+        // Tolerant match: PO receipts stamp the destination role onto the receiver
+        // string (e.g. "Juan Dela Cruz (Supply In-charge)" or
+        // "Juan Dela Cruz (Property Custodian - Supply In-charge)"), so an exact
+        // '=' comparison would hide every item posted through a purchase order.
+        $inv_where_conditions[] = "(i.receiver = 'Supply In-charge' OR i.receiver LIKE '%Supply In-charge%')";
     
     // Add search filter if search term is provided
     if (!empty($search_term)) {
