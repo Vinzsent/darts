@@ -60,6 +60,14 @@ $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 // Search: match PO number, supplier, or any line item description.
 $search_term = trim($_GET['search'] ?? '');
 
+// Server-side pagination: 20 purchase orders per page via ?page=N.
+// The search form only submits `search`, so a new search always lands on page 1.
+$per_page = 5;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) {
+    $page = 1;
+}
+
 $po_query = "
     SELECT 
         p.po_id,
@@ -103,21 +111,52 @@ $po_query = "
         p.created_at DESC
 ";
 
-$po_stmt = $conn->prepare($po_query);
+$like = '%' . $search_term . '%';
+
+// Count query wraps the exact same SELECT/GROUP BY so the total always matches
+// what the table would render without LIMIT (one grouped row per purchase
+// order). The trailing ORDER BY is dropped because it adds nothing to a count.
+$order_pos = strrpos($po_query, 'ORDER BY');
+$po_base_query = ($order_pos !== false) ? substr($po_query, 0, $order_pos) : $po_query;
+$count_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM ($po_base_query) AS cnt");
+if (!$count_stmt) {
+    die("Database error preparing count query: " . $conn->error);
+}
+$count_stmt->bind_param("ssss", $search_term, $like, $like, $like);
+$count_stmt->execute();
+$total_records = (int)($count_stmt->get_result()->fetch_assoc()['total'] ?? 0);
+$total_pages = max(1, (int)ceil($total_records / $per_page));
+if ($page > $total_pages) {
+    $page = $total_pages; // clamp (e.g. after the search narrows the results)
+}
+$offset = ($page - 1) * $per_page;
+
+$po_stmt = $conn->prepare($po_query . " LIMIT ? OFFSET ?");
 if (!$po_stmt) {
     die("Database error preparing query: " . $conn->error);
 }
-$like = '%' . $search_term . '%';
-$po_stmt->bind_param("ssss", $search_term, $like, $like, $like);
+// Placeholder order is LIMIT then OFFSET: per_page first, offset second.
+$po_stmt->bind_param("ssssii", $search_term, $like, $like, $like, $per_page, $offset);
 $po_stmt->execute();
 $po_result = $po_stmt->get_result();
 
+// Materialise the current page first, so the expandable sub-rows below only
+// load line items for the purchase orders actually visible on this page.
+$po_rows = [];
+while ($r = $po_result->fetch_assoc()) {
+    $po_rows[] = $r;
+}
+
 // Items grouped by PO (for the click-to-expand sub-rows)
 $items_map = [];
-$items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, received_date FROM purchase_order_items ORDER BY po_id, item_number ASC");
-if ($items_result) {
-    while ($it = $items_result->fetch_assoc()) {
-        $items_map[$it['po_id']][] = $it;
+$page_po_ids = array_map('intval', array_column($po_rows, 'po_id'));
+if ($page_po_ids) {
+    $ids_csv = implode(',', $page_po_ids);
+    $items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, received_date FROM purchase_order_items WHERE po_id IN ($ids_csv) ORDER BY po_id, item_number ASC");
+    if ($items_result) {
+        while ($it = $items_result->fetch_assoc()) {
+            $items_map[$it['po_id']][] = $it;
+        }
     }
 }
 
@@ -562,6 +601,44 @@ $verifier_name = 'Marilou L. Suarez';
             gap: 5px;
         }
     }
+
+    /* Pager */
+    .po-pager {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .po-pager-info {
+        font-size: 0.9rem;
+        color: #4b5563;
+    }
+
+    .po-pager .pagination {
+        margin: 0;
+    }
+
+    .po-pager .page-link {
+        color: var(--primary-green);
+        border-radius: 5px;
+        margin: 0 2px;
+        font-size: 0.875rem;
+    }
+
+    .po-pager .page-item.active .page-link {
+        background-color: var(--primary-green);
+        border-color: var(--primary-green);
+        color: #fff;
+    }
+
+    .po-pager .page-item.disabled .page-link {
+        color: #adb5bd;
+    }
 </style>
 
 <!-- Sidebar -->
@@ -613,7 +690,7 @@ $verifier_name = 'Marilou L. Suarez';
             </div>
         <?php endif; ?>
 
-        <?php if ($po_result && $po_result->num_rows > 0): ?>
+        <?php if (!empty($po_rows)): ?>
             <table class="po-table">
                 <thead>
                     <tr>
@@ -630,7 +707,7 @@ $verifier_name = 'Marilou L. Suarez';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($po = $po_result->fetch_assoc()): ?>
+                    <?php foreach ($po_rows as $po): ?>
                         <tr class="po-row" style="cursor: pointer;" onclick="togglePoItems(this, event)">
                             <td>
                                 <strong><?= htmlspecialchars($po['po_number']) ?></strong>
@@ -760,9 +837,66 @@ $verifier_name = 'Marilou L. Suarez';
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
+
+            <?php
+            // ── Pager ───────────────────────────────────────────────────────
+            // Every link keeps the active search so paging never clears the filter.
+            $pager_link = static function ($p) use ($search_term) {
+                $params = ['page' => $p];
+                if ($search_term !== '') {
+                    $params['search'] = $search_term;
+                }
+                return 'purchase_order_list.php?' . http_build_query($params);
+            };
+            $showing_from = $total_records > 0 ? $offset + 1 : 0;
+            $showing_to = min($offset + $per_page, $total_records);
+            ?>
+            <?php if ($total_pages > 1): ?>
+                <div class="po-pager">
+                    <div class="po-pager-info">
+                        Showing <strong><?= $showing_from ?>&ndash;<?= $showing_to ?></strong>
+                        of <strong><?= $total_records ?></strong> purchase orders
+                    </div>
+                    <nav aria-label="Purchase order pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                                <a class="page-link" href="<?= htmlspecialchars($pager_link(max(1, $page - 1))) ?>">&laquo; Prev</a>
+                            </li>
+                            <?php
+                            // Window of 5 pages around the current one, with ellipses.
+                            $window_start = max(1, $page - 2);
+                            $window_end = min($total_pages, $page + 2);
+                            if ($window_start > 1): ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= htmlspecialchars($pager_link(1)) ?>">1</a>
+                                </li>
+                                <?php if ($window_start > 2): ?>
+                                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                            <?php for ($i = $window_start; $i <= $window_end; $i++): ?>
+                                <li class="page-item <?= ($i === $page) ? 'active' : '' ?>">
+                                    <a class="page-link" href="<?= htmlspecialchars($pager_link($i)) ?>"><?= $i ?></a>
+                                </li>
+                            <?php endfor; ?>
+                            <?php if ($window_end < $total_pages): ?>
+                                <?php if ($window_end < $total_pages - 1): ?>
+                                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                                <?php endif; ?>
+                                <li class="page-item">
+                                    <a class="page-link" href="<?= htmlspecialchars($pager_link($total_pages)) ?>"><?= $total_pages ?></a>
+                                </li>
+                            <?php endif; ?>
+                            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                                <a class="page-link" href="<?= htmlspecialchars($pager_link(min($total_pages, $page + 1))) ?>">Next &raquo;</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            <?php endif; ?>
         <?php else: ?>
             <div class="empty-state">
                 <i class="fas fa-file-invoice"></i>
