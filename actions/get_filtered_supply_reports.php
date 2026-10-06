@@ -126,7 +126,8 @@ if ($report_type === 'stocklogs') {
     $item_search  = $_GET['log_item'] ?? '';
 
     $w = []; // Supply logs where receiver is Supply In-charge
-    $w[] = "sl.receiver = 'Supply In-charge'";
+    // Tolerant match so PO receipts ("Name (Role - Supply In-charge)") are included
+    $w[] = "(sl.receiver = 'Supply In-charge' OR sl.receiver LIKE '%Supply In-charge%')";
 
     if (!empty($date_start)) $w[] = "sl.date_created >= '" . safe($conn, $date_start) . " 00:00:00'";
     if (!empty($date_end))   $w[] = "sl.date_created <= '" . safe($conn, $date_end) . " 23:59:59'";
