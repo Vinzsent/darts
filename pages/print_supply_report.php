@@ -94,7 +94,7 @@ if ($report_type === 'stocklogs') {
     $item_search = $_GET['log_item'] ?? '';
     $as_of_default = fmt_date_range($date_start, $date_end) ?: $as_of_default;
 
-    $w = ["sl.receiver = 'Supply In-charge'"];
+    $w = ["(sl.receiver = 'Supply In-charge' OR sl.receiver LIKE '%Supply In-charge%')"];
     if (!empty($date_start)) $w[] = "sl.date_created >= '" . safe($conn, $date_start) . " 00:00:00'";
     if (!empty($date_end))   $w[] = "sl.date_created <= '" . safe($conn, $date_end)   . " 23:59:59'";
     if (!empty($move_types)) {
