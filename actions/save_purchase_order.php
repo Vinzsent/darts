@@ -12,6 +12,7 @@ ini_set('display_errors', 0);
 
 include '../includes/auth.php';
 include '../includes/db.php';
+require_once __DIR__ . '/../includes/po_inventory_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
@@ -116,6 +117,8 @@ function savePurchaseOrder($data, $conn, $user_id) {
         
         // Insert items
         $total_amount = 0;
+        // The location column is optional so this still works on older databases.
+        $has_location = po_location_column_exists($conn);
         if (isset($data['items']) && is_array($data['items'])) {
             foreach ($data['items'] as $index => $item) {
                 if (!empty($item['description'])) {
@@ -126,9 +129,18 @@ function savePurchaseOrder($data, $conn, $user_id) {
                     $line_total = $quantity * $unit_cost;
                     $total_amount += $line_total;
                     
-                    $item_sql = "INSERT INTO purchase_order_items 
-                                (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                                VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
+                    // Route marker: 'supply' -> inventory, 'property' -> property_inventory.
+                    // An empty value stays NULL, which falls back to the receiver's role.
+                    $location = po_normalize_location($item['location'] ?? '');
+                    $location_sql = $location === null ? 'NULL' : "'$location'";
+
+                    $item_sql = $has_location
+                        ? "INSERT INTO purchase_order_items
+                            (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
+                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total, $location_sql)"
+                        : "INSERT INTO purchase_order_items
+                            (po_id, item_number, item_description, quantity, unit_cost, line_total)
+                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
                     
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
