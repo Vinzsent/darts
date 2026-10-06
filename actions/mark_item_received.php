@@ -69,7 +69,7 @@ if (empty($item['location'])) {
     }
 }
 
-$po_stmt = $conn->prepare("SELECT po_id, po_number FROM purchase_orders WHERE po_id = ?");
+$po_stmt = $conn->prepare("SELECT po_id, po_number, supplier_name FROM purchase_orders WHERE po_id = ?");
 $po_stmt->bind_param("i", $item['po_id']);
 $po_stmt->execute();
 $po_res = $po_stmt->get_result();

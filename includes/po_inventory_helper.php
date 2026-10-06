@@ -10,10 +10,13 @@
  * Design rules:
  *  - Idempotent: each PO line is posted at most once, guarded by the
  *    uniq_*_source_poi unique index plus an explicit lookup.
- *  - Conservative matching: only an unambiguous existing row is incremented.
- *    Ambiguous or unmatched items create a NEW row rather than silently
- *    merging into the wrong bucket (property_inventory has many duplicate
- *    "Paint"/"Screw" rows with differing units).
+ *  - Supplier-aware matching: a row is stacked onto only when the item name
+ *    matches AND the supplier matches the PO's supplier. A row without a
+ *    recorded supplier counts as a match (and gets the PO's supplier
+ *    backfilled); a row with a DIFFERENT recorded supplier never matches.
+ *  - Conservative fallback: ambiguous matches create a NEW row rather than
+ *    silently merging into the wrong bucket (property_inventory has many
+ *    duplicate "Paint"/"Screw" rows with differing units).
  *  - Never destructive: stock is only ever increased here.
  */
 
@@ -32,6 +35,15 @@ function po_normalize_item_name($name)
 /** Which inventory table a PO item belongs to (defaults to supply). */
 function po_resolve_inventory_table($target)
 {
+    // Accept BOTH target names ('property' / 'supply') and already-resolved
+    // table names ('property_inventory' / 'inventory'). Callers such as
+    // po_find_matching_inventory() pass table names; mapping
+    // 'property_inventory' back through the old '$target === property' test
+    // fell through to 'inventory', so property receives searched the SUPPLY
+    // table, never found their own rows, and created duplicates every time.
+    if ($target === 'property_inventory') {
+        return 'property_inventory';
+    }
     return ($target === 'property') ? 'property_inventory' : 'inventory';
 }
 
@@ -131,19 +143,163 @@ function po_default_category($table)
 }
 
 /**
+ * Normalize a supplier name for comparison (" Ace  Hardware " == "ace hardware").
+ */
+function po_normalize_supplier_name($name)
+{
+    $s = strtolower(trim((string)$name));
+    return preg_replace('/\s+/', ' ', $s);
+}
+
+/**
+ * Resolve a supplier_id back to its name, checking the supplier table the
+ * given inventory table joins first, then the other one (legacy `inventory`
+ * rows carry ids from either supplier table).
+ *
+ * @return string trimmed name, or '' when the id cannot be resolved
+ */
+function po_supplier_id_to_name($conn, $table, $supplier_id)
+{
+    $supplier_id = (int)$supplier_id;
+    if ($supplier_id <= 0) {
+        return '';
+    }
+    $primary = ($table === 'property_inventory') ? 'supplier' : 'supply_supplier';
+    $secondary = ($table === 'property_inventory') ? 'supply_supplier' : 'supplier';
+    foreach ([$primary, $secondary] as $t) {
+        $stmt = $conn->prepare("SELECT supplier_name FROM `{$t}` WHERE supplier_id = ? LIMIT 1");
+        if (!$stmt) {
+            continue;
+        }
+        $stmt->bind_param('i', $supplier_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row && trim((string)$row['supplier_name']) !== '') {
+            return trim((string)$row['supplier_name']);
+        }
+    }
+    return '';
+}
+
+/**
+ * Resolve the supplier_id to STAMP on a row created for this inventory table.
+ * Only ids from the supplier table the UI joins are stored, so the Supplier
+ * column keeps displaying the right name.
+ *
+ * @return int|null
+ */
+function po_supplier_id_for_table($conn, $table, $supplier_name)
+{
+    $name = trim((string)$supplier_name);
+    if ($name === '') {
+        return null;
+    }
+    // Primary = the supplier table this inventory page joins (display name
+    // resolves directly). Fallback = the other catalog: PO suppliers are
+    // chosen from `supplier`, so a supply-inventory row would otherwise lose
+    // its supplier entirely when the name is not in `supply_supplier`.
+    $primary = ($table === 'property_inventory') ? 'supplier' : 'supply_supplier';
+    $secondary = ($table === 'property_inventory') ? 'supply_supplier' : 'supplier';
+    foreach ([$primary, $secondary] as $t) {
+        $stmt = $conn->prepare(
+            "SELECT supplier_id FROM `{$t}`
+             WHERE LOWER(TRIM(supplier_name)) = LOWER(TRIM(?))
+             ORDER BY supplier_id ASC LIMIT 1"
+        );
+        if (!$stmt) {
+            continue;
+        }
+        $stmt->bind_param('s', $name);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if ($row) {
+            return (int)$row['supplier_id'];
+        }
+    }
+    return null;
+}
+
+/**
+ * Pick the row to increment from a set of name-matching candidates, applying
+ * the supplier rule.
+ *
+ * @param array $rows rows must carry inventory_id, stock and supplier_id
+ * @param string|null $po_supplier_name supplier_name taken from the PO
+ * @return array|string|null chosen row, 'ambiguous' when several compatible
+ *                           rows exist (caller must not guess), or null when
+ *                           no candidate is supplier-compatible
+ */
+function po_pick_supplier_row($conn, $table, $rows, $po_supplier_name)
+{
+    $po_name = po_normalize_supplier_name($po_supplier_name);
+
+    $compatible = []; // unknown supplier or name-equal
+    $exact = [];      // recorded supplier whose name equals the PO's
+    foreach ($rows as $r) {
+        $sid = (int)($r['supplier_id'] ?? 0);
+        $row_name = ($sid > 0)
+            ? po_normalize_supplier_name(po_supplier_id_to_name($conn, $table, $sid))
+            : '';
+        if ($sid <= 0 || $row_name === '') {
+            $compatible[] = $r; // no supplier recorded -> unknown, matches
+            continue;
+        }
+        if ($po_name !== '' && $row_name === $po_name) {
+            $compatible[] = $r;
+            $exact[] = $r;
+        }
+        // different recorded supplier -> not compatible, skip
+    }
+
+    if (count($compatible) === 0) {
+        return null; // every name-match belongs to another supplier
+    }
+
+    // 1) Same recorded supplier + same name is the strongest signal.
+    //    Rows are ordered by inventory_id, so the oldest row absorbs the stock.
+    if (count($exact) > 0) {
+        return $exact[0];
+    }
+
+    // 2) All compatible rows have no supplier recorded yet.
+    if (count($compatible) === 1) {
+        return $compatible[0];
+    }
+    if ($po_name !== '') {
+        // The PO carries a supplier but the rows don't: stack onto the oldest
+        // row; the caller backfills its supplier, so the NEXT receive from a
+        // different supplier will no longer match it.
+        return $compatible[0];
+    }
+
+    // 3) Neither side has a supplier and several rows match: don't guess
+    //    (same conservative behaviour the old code had for duplicate names).
+    return 'ambiguous';
+}
+
+/**
  * Find an existing inventory row for this PO line.
+ *
+ * Matching is by item name (exact, then normalized) filtered by supplier:
+ * same supplier + same name stacks onto the row; a row without a recorded
+ * supplier also matches; rows from a different recorded supplier never match.
  *
  * @return array|null ['inventory_id'=>int,'current_stock'=>int,'match'=>'exact'|'normalized'] or null
  */
-function po_find_matching_inventory($conn, $table, $item_description)
+function po_find_matching_inventory($conn, $table, $item_description, $supplier_name = null)
 {
     $safe_table = po_resolve_inventory_table($table);
 
     // 1) Exact case-insensitive match on the raw description.
-    $sql = "SELECT inventory_id, COALESCE(current_stock,0) AS stock
+    //    LIMIT 50 (was 2): the supplier rule needs every name-matching row to
+    //    decide which one is compatible before giving up.
+    $sql = "SELECT inventory_id, COALESCE(current_stock,0) AS stock, supplier_id
             FROM `{$safe_table}`
             WHERE LOWER(TRIM(item_name)) = LOWER(TRIM(?))
-            LIMIT 2";
+            ORDER BY inventory_id ASC
+            LIMIT 50";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         return null;
@@ -157,15 +313,20 @@ function po_find_matching_inventory($conn, $table, $item_description)
     }
     $stmt->close();
 
-    // Exactly one exact match is safe to increment.
-    if (count($rows) === 1) {
-        return ['inventory_id' => (int)$rows[0]['inventory_id'],
-                'current_stock' => (int)$rows[0]['stock'],
-                'match' => 'exact'];
-    }
-    if (count($rows) > 1) {
-        // Several identical rows (common in property_inventory) — do not guess.
-        return null;
+    if (count($rows) > 0) {
+        $pick = po_pick_supplier_row($conn, $safe_table, $rows, $supplier_name);
+        if (is_array($pick)) {
+            return ['inventory_id' => (int)$pick['inventory_id'],
+                    'current_stock' => (int)$pick['stock'],
+                    'match' => 'exact'];
+        }
+        if ($pick === 'ambiguous') {
+            // Several compatible rows (common in property_inventory) — do not guess.
+            return null;
+        }
+        // Every exact-name row belongs to a different recorded supplier:
+        // fall through to the normalized pass, which may still surface a
+        // compatible row whose raw spelling differs.
     }
 
     // 2) Fall back to a normalised match, accepted only when unambiguous.
@@ -174,9 +335,10 @@ function po_find_matching_inventory($conn, $table, $item_description)
         return null;
     }
 
-    $sql2 = "SELECT inventory_id, COALESCE(current_stock,0) AS stock, item_name
+    $sql2 = "SELECT inventory_id, COALESCE(current_stock,0) AS stock, item_name, supplier_id
              FROM `{$safe_table}`
              WHERE LOWER(TRIM(item_name)) LIKE ?
+             ORDER BY inventory_id ASC
              LIMIT 50";
     $stmt2 = $conn->prepare($sql2);
     if (!$stmt2) {
@@ -194,10 +356,14 @@ function po_find_matching_inventory($conn, $table, $item_description)
     }
     $stmt2->close();
 
-    if (count($candidates) === 1) {
-        return ['inventory_id' => (int)$candidates[0]['inventory_id'],
-                'current_stock' => (int)$candidates[0]['stock'],
-                'match' => 'normalized'];
+    if (count($candidates) > 0) {
+        $pick = po_pick_supplier_row($conn, $safe_table, $candidates, $supplier_name);
+        if (is_array($pick)) {
+            return ['inventory_id' => (int)$pick['inventory_id'],
+                    'current_stock' => (int)$pick['stock'],
+                    'match' => 'normalized'];
+        }
+        // null (no supplier-compatible row) or 'ambiguous' -> new row
     }
 
     return null; // zero or ambiguous -> caller creates a new row
@@ -367,7 +533,10 @@ function po_record_item_link($conn, $table, $inventory_id, $poi_id, $po_id, $ite
     $name      = (string)$item_name;
     $qty_val   = (float)$qty;
 
-    $stmt->bind_param('issids', $poi_id, $inv_table, $inv_id,
+    // Types (was 'issids'): poi_id=i, inventory_table=s, inventory_id=i,
+    // po_id=i, item_name=s, quantity_added=d. The old string bound item_name
+    // as a DOUBLE, so 'testing' was stored as 0 and quantity as a string.
+    $stmt->bind_param('isiisd', $poi_id, $inv_table, $inv_id,
                        $po_id_val, $name, $qty_val);
     $ok = $stmt->execute();
     $stmt->close();
@@ -399,6 +568,9 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     $desc   = trim((string)$item['item_description']);
     $qty    = (int)round((float)$item['quantity']);
     $unit_cost = (float)$item['unit_cost'];
+    // The PO's supplier drives the stacking rule: same supplier + same item
+    // name adds to the current stock instead of creating another row.
+    $po_supplier_name = trim((string)($po['supplier_name'] ?? ''));
     if (empty($received_date)) {
         $received_date = date('Y-m-d H:i:s');
     }
@@ -459,10 +631,10 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
                       'match' => 'same-po'];
         } else {
             $sib->close();
-            $match = po_find_matching_inventory($conn, $table, $desc);
+            $match = po_find_matching_inventory($conn, $table, $desc, $po_supplier_name);
         }
     } else {
-        $match = po_find_matching_inventory($conn, $table, $desc);
+        $match = po_find_matching_inventory($conn, $table, $desc, $po_supplier_name);
     }
     $po_number = (string)($po['po_number'] ?? '');
 
@@ -487,6 +659,21 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         }
         $upd->close();
 
+        // Record the PO's supplier on a row that never had one, so future
+        // receives from a different supplier no longer stack onto it.
+        $backfill_sid = po_supplier_id_for_table($conn, $table, $po_supplier_name);
+        if ($backfill_sid !== null) {
+            $bf = $conn->prepare(
+                "UPDATE `{$table}` SET supplier_id = ?
+                 WHERE inventory_id = ? AND (supplier_id IS NULL OR supplier_id = 0)"
+            );
+            if ($bf) {
+                $bf->bind_param('ii', $backfill_sid, $inv_id);
+                $bf->execute();
+                $bf->close();
+            }
+        }
+
         po_record_item_link($conn, $table, $inv_id, $poi_id, $po_id, $desc, $qty);
 
         po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new,
@@ -503,17 +690,21 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     $receiver_str = po_build_receiver_string($conn, $user_id, $target);
     $brand_label = 'N/A';
     $p_user_id = $user_id ? (int)$user_id : null;
+    // Stamp the PO's supplier so the next receive of the same item can find
+    // this row (and a different supplier will NOT stack onto it).
+    $p_supplier_id = po_supplier_id_for_table($conn, $table, $po_supplier_name);
 
     $ins = $conn->prepare(
-        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, brand, status, receiver, source_po_id, source_poi_id, date_created, date_received, created_by)
-         VALUES (?, ?, ?, ?, 'pcs', ?, ?, 'Active', ?, ?, ?, NOW(), ?, ?)"
+        "INSERT INTO `{$table}` (item_name, category, current_stock, quantity, unit, unit_cost, brand, status, receiver, source_po_id, source_poi_id, date_created, date_received, created_by, supplier_id)
+         VALUES (?, ?, ?, ?, 'pcs', ?, ?, 'Active', ?, ?, ?, NOW(), ?, ?, ?)"
     );
     if (!$ins) {
         return ['status' => 'error', 'message' => 'DB error: ' . $conn->error];
     }
     // Placeholders in order: item_name, category, current_stock, quantity,
-    // unit_cost, brand, receiver, source_po_id, source_poi_id, date_received, created_by -> "ss"+"ii"+"d"+"s"+"s"+"ii"+"s"+"i"
-    $ins->bind_param('ssiidssiisi', $desc, $category, $qty, $qty, $unit_cost, $brand_label, $receiver_str, $po_id, $poi_id, $received_date, $p_user_id);
+    // unit_cost, brand, receiver, source_po_id, source_poi_id, date_received,
+    // created_by, supplier_id -> "ss"+"ii"+"d"+"s"+"s"+"ii"+"s"+"i"+"i"
+    $ins->bind_param('ssiidssiisii', $desc, $category, $qty, $qty, $unit_cost, $brand_label, $receiver_str, $po_id, $poi_id, $received_date, $p_user_id, $p_supplier_id);
     if (!$ins->execute()) {
         $msg = 'DB error: ' . $ins->error;
         $ins->close();

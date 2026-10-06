@@ -42,7 +42,7 @@ $received_date = date('Y-m-d H:i:s');
 
 // Confirm the PO exists first — the UPDATE below may legitimately affect 0 rows
 // when the PO is already Received and the values are unchanged (notes resubmitted).
-$exists_stmt = $conn->prepare("SELECT po_id, po_number FROM purchase_orders WHERE po_id = ?");
+$exists_stmt = $conn->prepare("SELECT po_id, po_number, supplier_name FROM purchase_orders WHERE po_id = ?");
 $exists_stmt->bind_param("i", $po_id);
 $exists_stmt->execute();
 $exists_result = $exists_stmt->get_result();
@@ -51,7 +51,9 @@ if (!$exists_result || $exists_result->num_rows === 0) {
     echo json_encode(['success' => false, 'message' => 'Purchase order not found.']);
     exit;
 }
-$po_number = (string)($exists_result->fetch_assoc()['po_number'] ?? '');
+$exists_row = $exists_result->fetch_assoc();
+$po_number = (string)($exists_row['po_number'] ?? '');
+$po_supplier_name = (string)($exists_row['supplier_name'] ?? '');
 $exists_stmt->close();
 
 // Duplicate guard: the UI disables the button once every line item is received,
@@ -135,7 +137,7 @@ if ($mark_all_items) {
     if (!function_exists('po_post_item_to_inventory')) {
         require_once __DIR__ . '/../includes/po_inventory_helper.php';
     }
-    $po_row = ['po_id' => $po_id, 'po_number' => $po_number];
+    $po_row = ['po_id' => $po_id, 'po_number' => $po_number, 'supplier_name' => $po_supplier_name];
     foreach ($pending_items as $pi) {
         $r = po_post_item_to_inventory($conn, $po_row, $pi, $target, $received_by, $received_date);
         $r['item_description'] = $pi['item_description'];
