@@ -89,21 +89,57 @@ $query = "
     END, p.created_at DESC
 ";
 
+// ── Pagination: 20 purchase orders per page via ?page=N ──
+$per_page = 5;
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+if ($page < 1) {
+    $page = 1;
+}
+
+// Count wraps the same SELECT/GROUP BY so the total always equals the rows the
+// table would show without LIMIT (one grouped row per purchase order). The
+// trailing ORDER BY is dropped because it adds nothing to a count.
+$order_pos = strrpos($query, 'ORDER BY');
+$base_query = ($order_pos !== false) ? substr($query, 0, $order_pos) : $query;
+$count_result = $conn->query("SELECT COUNT(*) AS total FROM ($base_query) AS cnt");
+$total_records = $count_result ? (int)($count_result->fetch_assoc()['total'] ?? 0) : 0;
+$total_pages = max(1, (int)ceil($total_records / $per_page));
+if ($page > $total_pages) {
+    $page = $total_pages; // clamp (e.g. after rows are received/removed)
+}
+$offset = ($page - 1) * $per_page;
+
+$query .= " LIMIT $per_page OFFSET $offset"; // integers only, safe to interpolate
+
 $result = $conn->query($query);
 if (!$result) {
     $query_error = $conn->error;
 }
 
+// Materialise the current page so the expandable sub-rows below only load
+// line items for the purchase orders actually visible on this page.
+$po_rows = [];
+if ($result) {
+    while ($r = $result->fetch_assoc()) {
+        $po_rows[] = $r;
+    }
+}
+
 // Line items per PO, for the expandable detail rows
 $items_map = [];
-$items_result = $conn->query("
-    SELECT poi_id, po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, $poi_recv_col
-    FROM purchase_order_items
-    ORDER BY po_id, item_number ASC
-");
-if ($items_result) {
-    while ($it = $items_result->fetch_assoc()) {
-        $items_map[$it['po_id']][] = $it;
+$page_po_ids = array_map('intval', array_column($po_rows, 'po_id'));
+if ($page_po_ids) {
+    $ids_csv = implode(',', $page_po_ids);
+    $items_result = $conn->query("
+        SELECT poi_id, po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, $poi_recv_col
+        FROM purchase_order_items
+        WHERE po_id IN ($ids_csv)
+        ORDER BY po_id, item_number ASC
+    ");
+    if ($items_result) {
+        while ($it = $items_result->fetch_assoc()) {
+            $items_map[$it['po_id']][] = $it;
+        }
     }
 }
 ?>
@@ -283,6 +319,44 @@ if ($items_result) {
             margin-left: 0;
         }
     }
+
+    /* Pager */
+    .po-pager {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .po-pager-info {
+        font-size: 0.9rem;
+        color: #4b5563;
+    }
+
+    .po-pager .pagination {
+        margin: 0;
+    }
+
+    .po-pager .page-link {
+        color: var(--primary-green);
+        border-radius: 5px;
+        margin: 0 2px;
+        font-size: 0.875rem;
+    }
+
+    .po-pager .page-item.active .page-link {
+        background-color: var(--primary-green);
+        border-color: var(--primary-green);
+        color: #fff;
+    }
+
+    .po-pager .page-item.disabled .page-link {
+        color: #adb5bd;
+    }
 </style>
 
 <!-- Sidebar -->
@@ -322,8 +396,8 @@ if ($items_result) {
                             <small><?= htmlspecialchars($query_error ?? 'Unknown database error') ?></small>
                         </td>
                     </tr>
-                <?php elseif ($result->num_rows > 0): ?>
-                    <?php while ($row = $result->fetch_assoc()): ?>
+                <?php elseif (!empty($po_rows)): ?>
+                    <?php foreach ($po_rows as $row): ?>
                         <?php
                         $row_items = $items_map[$row['po_id']] ?? [];
                         $total_items = (int)$row['item_count'];
@@ -428,7 +502,7 @@ if ($items_result) {
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
                         <td colspan="9" style="text-align: center; padding: 40px; color: #6c757d;">
@@ -439,6 +513,50 @@ if ($items_result) {
                 <?php endif; ?>
             </tbody>
         </table>
+
+        <?php if ($total_pages > 1): ?>
+            <div class="po-pager">
+                <div class="po-pager-info">
+                    Showing <strong><?= $total_records > 0 ? $offset + 1 : 0 ?>&ndash;<?= min($offset + $per_page, $total_records) ?></strong>
+                    of <strong><?= $total_records ?></strong> purchase orders
+                </div>
+                <nav aria-label="Received items pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="received_items.php?page=<?= max(1, $page - 1) ?>">&laquo; Prev</a>
+                        </li>
+                        <?php
+                        // Window of 5 pages around the current one, with ellipses.
+                        $window_start = max(1, $page - 2);
+                        $window_end = min($total_pages, $page + 2);
+                        if ($window_start > 1): ?>
+                            <li class="page-item">
+                                <a class="page-link" href="received_items.php?page=1">1</a>
+                            </li>
+                            <?php if ($window_start > 2): ?>
+                                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        <?php for ($i = $window_start; $i <= $window_end; $i++): ?>
+                            <li class="page-item <?= ($i === $page) ? 'active' : '' ?>">
+                                <a class="page-link" href="received_items.php?page=<?= $i ?>"><?= $i ?></a>
+                            </li>
+                        <?php endfor; ?>
+                        <?php if ($window_end < $total_pages): ?>
+                            <?php if ($window_end < $total_pages - 1): ?>
+                                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                            <?php endif; ?>
+                            <li class="page-item">
+                                <a class="page-link" href="received_items.php?page=<?= $total_pages ?>"><?= $total_pages ?></a>
+                            </li>
+                        <?php endif; ?>
+                        <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="received_items.php?page=<?= min($total_pages, $page + 1) ?>">Next &raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
