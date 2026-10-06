@@ -35,6 +35,95 @@ function po_resolve_inventory_table($target)
     return ($target === 'property') ? 'property_inventory' : 'inventory';
 }
 
+/**
+ * Normalise the free-text `location` mark on a PO line into a canonical bucket.
+ *
+ * Accepts whatever the user actually types/selects ("Supply", "supply in-charge",
+ * "Property", "Property Custodian", ...) and returns 'supply'|'property', or null
+ * when nothing usable was marked (null = "let the receiver's role decide").
+ */
+function po_normalize_location($location)
+{
+    $s = strtolower(trim((string)$location));
+    if ($s === '') {
+        return null;
+    }
+    // "property"/"properties"/"property custodian" -> property
+    if (strpos($s, 'prop') !== false) {
+        return 'property';
+    }
+    // "supply"/"supplies"/"supply in-charge" -> supply
+    if (strpos($s, 'sup') !== false) {
+        return 'supply';
+    }
+    return null;
+}
+
+/**
+ * Is the location column deployed? Older databases predate it, so callers must
+ * probe instead of assuming the column exists.
+ */
+function po_location_column_exists($conn)
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+    $res = $conn->query("SHOW COLUMNS FROM purchase_order_items LIKE 'location'");
+    $exists = ($res && $res->num_rows > 0);
+    if ($res) {
+        $res->free();
+    }
+    return $exists;
+}
+
+/**
+ * Where a single PO line belongs.
+ *
+ * Precedence: the location marked on the line wins, because that is what the
+ * user explicitly chose; otherwise fall back to the receiver's role.
+ */
+function po_resolve_target_for_item($location, $raw_user_type, $requested = null)
+{
+    $marked = po_normalize_location($location);
+    if ($marked !== null) {
+        return $marked;
+    }
+    return po_resolve_target_for_role($raw_user_type, $requested);
+}
+
+/**
+ * Store a location mark on a PO line, but never overwrite a mark that is already set.
+ *
+ * Called by the receive actions so a `location` value submitted together with the
+ * receive click is persisted on the line instead of being discarded once the stock
+ * has been posted — that way the Location column keeps showing Supply/Property.
+ *
+ * @return bool true when the value was written
+ */
+function po_apply_location_to_item($conn, $poi_id, $location)
+{
+    $normalized = po_normalize_location($location);
+    $line_id = (int)$poi_id;
+    if ($normalized === null || $line_id <= 0 || !po_location_column_exists($conn)) {
+        return false;
+    }
+
+    $upd = $conn->prepare(
+        "UPDATE purchase_order_items
+         SET location = ?
+         WHERE poi_id = ? AND (location IS NULL OR TRIM(location) = '')"
+    );
+    if (!$upd) {
+        return false;
+    }
+    // bind_param() needs real variables (passed by reference), not expressions
+    $upd->bind_param('si', $normalized, $line_id);
+    $ok = $upd->execute();
+    $upd->close();
+    return (bool)$ok;
+}
+
 /** Default category for auto-created rows, matching existing data. */
 function po_default_category($table)
 {
@@ -292,6 +381,18 @@ function po_record_item_link($conn, $table, $inventory_id, $poi_id, $po_id, $ite
  */
 function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_id = null, $received_date = null)
 {
+    // A location marked on the PO line ("supply" / "property") always wins over the
+    // receiver's role, so each line lands in the inventory table that was chosen for it.
+    $marked_location = po_normalize_location($item['location'] ?? '');
+    if ($marked_location !== null) {
+        $target = $marked_location;
+    } elseif (po_location_column_exists($conn)) {
+        // The line was never marked, so the receiver's role decided. Write that
+        // effective destination back to the line, otherwise the Location column
+        // would stay NULL forever on items that were received without a mark.
+        po_apply_location_to_item($conn, $item['poi_id'] ?? 0, $target);
+    }
+
     $table = po_resolve_inventory_table($target);
     $poi_id = (int)$item['poi_id'];
     $po_id  = (int)$po['po_id'];
@@ -303,11 +404,11 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     }
 
     if ($poi_id <= 0 || $desc === '') {
-        return ['status' => 'error', 'message' => 'Missing PO line data.'];
+        return ['status' => 'error', 'message' => 'Missing PO line data.', 'target' => $target];
     }
     if ($qty <= 0) {
         // Nothing physically arrived — record the flag but do not inflate stock.
-        return ['status' => 'skipped', 'message' => 'Quantity is 0; not added to stock.'];
+        return ['status' => 'skipped', 'message' => 'Quantity is 0; not added to stock.', 'target' => $target];
     }
 
     // Idempotency guard, part 1: the link table. A PO line that was merged into a
@@ -320,7 +421,7 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         $lk_res = $lk->get_result();
         if ($lk_res && $lk_res->num_rows > 0) {
             $lk->close();
-            return ['status' => 'skipped', 'message' => 'Already added to inventory.'];
+            return ['status' => 'skipped', 'message' => 'Already added to inventory.', 'target' => $target];
         }
         $lk->close();
     }
@@ -333,7 +434,7 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         $chk_res = $chk->get_result();
         if ($chk_res && $chk_res->num_rows > 0) {
             $chk->close();
-            return ['status' => 'skipped', 'message' => 'Already added to inventory.'];
+            return ['status' => 'skipped', 'message' => 'Already added to inventory.', 'target' => $target];
         }
         $chk->close();
     }
@@ -393,6 +494,7 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
 
         return ['status' => 'incremented', 'inventory_id' => $inv_id,
                 'previous_stock' => $prev, 'new_stock' => $new, 'match' => $match['match'],
+                'target' => $target,
                 'message' => "Added {$qty} to existing inventory item."];
     }
 
@@ -426,5 +528,6 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
         "Received from PO {$po_number} (new item)", $user_id, $receiver_str);
 
     return ['status' => 'created', 'inventory_id' => $new_id, 'new_stock' => $qty,
+            'target' => $target,
             'message' => 'Created new inventory item from received PO line.'];
 }
