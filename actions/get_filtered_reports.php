@@ -49,7 +49,7 @@ if ($report_type === 'inventory') {
     $stock_status = $_GET['stock_status'] ?? [];
     $item_status  = $_GET['item_status']  ?? [];
 
-    $w = ["i.receiver = 'Property Custodian'"];
+    $w = ["(i.receiver = 'Property Custodian' OR i.receiver LIKE '%Property Custodian%')"];
 
     if (!empty($category))
         $w[] = "i.category = '" . safe($conn, $category) . "'";
@@ -149,7 +149,7 @@ if ($report_type === 'stocklogs') {
     $move_types   = $_GET['move_type'] ?? [];
     $item_search  = $_GET['log_item'] ?? '';
 
-    $w = ["sl.receiver = 'Property Custodian'"];
+    $w = ["(sl.receiver = 'Property Custodian' OR sl.receiver LIKE '%Property Custodian%')"];
 
     if (!empty($date_start)) $w[] = "sl.date_created >= '" . safe($conn, $date_start) . " 00:00:00'";
     if (!empty($date_end))   $w[] = "sl.date_created <= '" . safe($conn, $date_end) . " 23:59:59'";
