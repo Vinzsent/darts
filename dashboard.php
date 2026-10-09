@@ -831,6 +831,16 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         <a href="pages/received_items.php" class="card-button">Access</a>
       </div>
 
+      <!-- Purchase Order List Card -->
+      <div class="menu-card card-warning">
+        <div class="card-icon">
+          <i class="fas fa-shopping-cart"></i>
+        </div>
+        <h3 class="card-title">Purchase Order List</h3>
+        <p class="card-description">View and manage purchase orders, track orders, and monitor order status.</p>
+        <a href="pages/purchase_order_list.php" class="card-button">Access</a>
+      </div>
+
       <!-- Inventory Card -->
       <div class="menu-card card-info">
         <div class="card-icon">
@@ -892,6 +902,16 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         <h3 class="card-title">Received Items</h3>
         <p class="card-description">Record and track new supplier transactions. Manage incoming inventory and update stock levels.</p>
         <a href="pages/received_items.php" class="card-button">Access</a>
+      </div>
+
+      <!-- Purchase Order List Card -->
+      <div class="menu-card card-warning">
+        <div class="card-icon">
+          <i class="fas fa-shopping-cart"></i>
+        </div>
+        <h3 class="card-title">Purchase Order List</h3>
+        <p class="card-description">View and manage purchase orders, track orders, and monitor order status.</p>
+        <a href="pages/purchase_order_list.php" class="card-button">Access</a>
       </div>
 
       <div class="menu-card card-info">
