@@ -1019,8 +1019,14 @@ $verifier_name = 'Marilou L. Suarez';
         let grandTotal = 0;
 
         items.forEach(item => {
-            const isRecv = parseInt(item.is_received) === 1;
-            const recvDateStr = item.received_date ? new Date(item.received_date).toLocaleDateString() : '';
+            const rawRecv = parseInt(item.is_received, 10);
+            const isRecv = rawRecv === 1;
+            const isPending = (item.is_received === null || item.is_received === undefined || rawRecv === 0 || Number.isNaN(rawRecv));
+            // Only show a date once the line is actually received. Pending rows
+            // may carry a stale received_date (creation-date default or failed
+            // attempt) — showing it implies delivered when it is not.
+            const rawDate = (item.received_date && String(item.received_date).indexOf('0000') !== 0) ? String(item.received_date) : '';
+            const recvDateStr = (isRecv && rawDate) ? new Date(rawDate).toLocaleDateString() : '';
             itemsHtml += `
                 <tr>
                     <td>${item.item_number}</td>
@@ -1286,7 +1292,17 @@ $verifier_name = 'Marilou L. Suarez';
                     target: target
                 })
             })
-            .then(response => response.json())
+            .then(async response => {
+                const text = await response.text();
+                let data = null;
+                try { data = text ? JSON.parse(text) : null; }
+                catch (e) {
+                    console.error('Non-JSON reply from mark_item_received.php:', text.slice(0, 2000));
+                    throw new Error('Server returned non-JSON (' + response.status + '): ' + text.slice(0, 300));
+                }
+                if (!response.ok) throw new Error('HTTP ' + response.status + ': ' + (data && data.message ? data.message : text.slice(0, 300)));
+                return data;
+            })
             .then(data => {
                 if (data.success) {
                     alert(data.message);
@@ -1302,7 +1318,11 @@ $verifier_name = 'Marilou L. Suarez';
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('An error occurred. Please try again.');
+                alert('Receive failed: ' + (error && error.message ? error.message : error) + '\nCheck DevTools > Network > mark_item_received.php > Response for the PHP error.');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Receive Items';
+                }
             });
     }
 
