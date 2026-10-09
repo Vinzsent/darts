@@ -80,22 +80,46 @@ try {
     while ($poi_res && $col = $poi_res->fetch_assoc()) {
         $poi_cols[] = $col['Field'];
     }
-    $poi_recv_col = in_array('received_date', $poi_cols, true) ? 'received_date' : (in_array('date_received', $poi_cols, true) ? 'date_received AS received_date' : 'NULL AS received_date');
+    $poi_recv_col = in_array('received_date', $poi_cols, true) ? 'poi.received_date' : (in_array('date_received', $poi_cols, true) ? 'poi.date_received AS received_date' : 'NULL AS received_date');
+    // Per-item receiver (who clicked Receive on that line). Older databases may
+    // not have the column yet, so fall back to the PO-level receiver.
+    $has_item_recv_by = in_array('received_by', $poi_cols, true);
+    $item_recv_by_col = $has_item_recv_by ? 'poi.received_by AS item_received_by' : 'p.received_by AS item_received_by';
+    if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
+        $item_receiver_expr = $has_item_recv_by
+            ? "NULLIF(TRIM(CONCAT_WS(' ', iu.first_name, iu.last_name)), '')"
+            : $receiver_name_expr;
+    } elseif (in_array('firstname', $user_cols, true) && in_array('lastname', $user_cols, true)) {
+        $item_receiver_expr = $has_item_recv_by
+            ? "NULLIF(TRIM(CONCAT_WS(' ', iu.firstname, iu.lastname)), '')"
+            : $receiver_name_expr;
+    } elseif (in_array('name', $user_cols, true)) {
+        $item_receiver_expr = $has_item_recv_by ? "NULLIF(TRIM(iu.name), '')" : $receiver_name_expr;
+    } else {
+        $item_receiver_expr = $has_item_recv_by ? "NULLIF(TRIM(iu.username), '')" : $receiver_name_expr;
+    }
+    $item_join = $has_item_recv_by ? "LEFT JOIN `user` iu ON CAST(poi.received_by AS UNSIGNED) = iu.id" : "";
 
     // Get purchase order items
     $items_query = "
-        SELECT 
-            poi_id,
-            item_number,
-            item_description,
-            quantity,
-            unit_cost,
-            line_total,
-            is_received,
-            $poi_recv_col
-        FROM purchase_order_items
-        WHERE po_id = ?
-        ORDER BY item_number ASC
+        SELECT
+            poi.poi_id,
+            poi.item_number,
+            poi.item_description,
+            poi.quantity,
+            poi.unit_cost,
+            poi.line_total,
+            poi.is_received,
+            $poi_recv_col,
+            $item_recv_by_col,
+            COALESCE($item_receiver_expr, " . ($has_item_recv_by ? "iu.username" : "ru.username") . ", NULLIF(" . ($has_item_recv_by ? "poi.received_by" : "p.received_by") . ", ''), 'Unknown') AS item_received_by_name,
+            " . ($has_item_recv_by ? "iu.user_type" : "ru.user_type") . " AS item_received_by_role
+        FROM purchase_order_items poi
+        JOIN purchase_orders p ON p.po_id = poi.po_id
+        LEFT JOIN `user` ru ON CAST(p.received_by AS UNSIGNED) = ru.id
+        $item_join
+        WHERE poi.po_id = ?
+        ORDER BY poi.item_number ASC
     ";
     
     $stmt = $conn->prepare($items_query);
