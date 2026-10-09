@@ -1,4 +1,14 @@
 <?php
+// Always return JSON, even on PHP fatals that would corrupt fetch().json()
+ob_start();
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'PHP fatal: ' . $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line']]);
+    }
+});
 include '../includes/auth.php';
 include '../includes/db.php';
 
@@ -102,7 +112,7 @@ if ($mark_all_items) {
     $pending_stmt = $conn->prepare(
         "SELECT poi_id, item_description, quantity, unit_cost{$location_col_sql}
          FROM purchase_order_items
-         WHERE po_id = ? AND is_received = 0"
+         WHERE po_id = ? AND COALESCE(is_received, 0) = 0"
     );
     $pending_items = [];
     if ($pending_stmt) {
@@ -126,22 +136,34 @@ if ($mark_all_items) {
         }
     }
 
-    $item_stmt = $conn->prepare("UPDATE purchase_order_items SET is_received = 1, received_date = ? WHERE po_id = ? AND is_received = 0");
-    if ($item_stmt) {
-        $item_stmt->bind_param("si", $received_date, $po_id);
-        $item_stmt->execute();
-        $item_stmt->close();
-    }
-
-    // Post each newly received line into inventory.
+    // Post each newly received line into inventory FIRST, then flag only
+    // the lines whose stock actually landed. A line whose insert fails
+    // stays is_received=0 (Pending) so it can be retried — never stranded.
     if (!function_exists('po_post_item_to_inventory')) {
         require_once __DIR__ . '/../includes/po_inventory_helper.php';
     }
     $po_row = ['po_id' => $po_id, 'po_number' => $po_number, 'supplier_name' => $po_supplier_name];
+    $posted_ok_ids = [];
+    $post_errors = [];
     foreach ($pending_items as $pi) {
         $r = po_post_item_to_inventory($conn, $po_row, $pi, $target, $received_by, $received_date);
         $r['item_description'] = $pi['item_description'];
         $stock_results[] = $r;
+        if (($r['status'] ?? '') === 'incremented' || ($r['status'] ?? '') === 'created' || ($r['status'] ?? '') === 'skipped') {
+            $posted_ok_ids[] = (int)$pi['poi_id'];
+        } else {
+            $post_errors[] = $pi['item_description'] . ': ' . ($r['message'] ?? 'unknown');
+        }
+    }
+
+    // Flag only posted lines. Bulk-flag-then-post stranded failures as Received.
+    if ($posted_ok_ids) {
+        $ids_csv = implode(',', array_map('intval', $posted_ok_ids));
+        $conn->query("UPDATE purchase_order_items SET is_received = 1, received_date = '" . $conn->real_escape_string($received_date) . "', received_by = COALESCE(NULLIF(received_by, ''), '" . $conn->real_escape_string((string)$received_by) . "') WHERE poi_id IN ($ids_csv)");
+    }
+    if ($post_errors && count($posted_ok_ids) === 0) {
+        echo json_encode(['success' => false, 'message' => 'No stock posted: ' . implode('; ', $post_errors)]);
+        exit;
     }
 }
 
