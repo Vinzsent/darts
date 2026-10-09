@@ -60,13 +60,13 @@ if ($result->num_rows > 0):
             <div class="action-dropdown-menu">
               <a href="#" class="action-dropdown-item" data-bs-toggle="modal" data-bs-target="#viewModal"
                 <?php foreach ($row as $key => $value): ?>
-                data-<?= htmlspecialchars(str_replace('_', '-', $key)) ?>="<?= htmlspecialchars($value) ?>"
+                data-<?= htmlspecialchars(str_replace('_', '-', $key)) ?>="<?= htmlspecialchars((string)$value) ?>"
                 <?php endforeach; ?>>
                 <i class="fas fa-eye text-info me-2"></i> View Details
               </a>
               <a href="#" class="action-dropdown-item" data-bs-toggle="modal" data-bs-target="#editModal"
                 <?php foreach ($row as $key => $value): ?>
-                data-<?= htmlspecialchars(str_replace('_', '-', $key)) ?>="<?= htmlspecialchars($value) ?>"
+                data-<?= htmlspecialchars(str_replace('_', '-', $key)) ?>="<?= htmlspecialchars((string)$value) ?>"
                 <?php endforeach; ?>>
                 <i class="fas fa-edit text-warning me-2"></i> Edit Supplier
               </a>
