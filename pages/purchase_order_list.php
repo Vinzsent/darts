@@ -751,17 +751,6 @@ $verifier_name = 'Marilou L. Suarez';
                                 </span>
                                 <br>
                                 <small class="text-muted"><?= $recv_label ?></small>
-                                <?php if (!empty($po['received_by_name'])): ?>
-                                    <div class="mt-1" style="font-size: 0.75rem; color: #155724; line-height: 1.2;">
-                                        <i class="fas fa-user-check"></i> <strong><?= htmlspecialchars($po['received_by_name']) ?></strong>
-                                        <?php if (!empty($po['received_by_role'])): ?>
-                                            <br><span style="color: #374151;">(<?= htmlspecialchars($po['received_by_role']) ?>)</span>
-                                        <?php endif; ?>
-                                        <?php if (!empty($po['received_date'])): ?>
-                                            <br><span style="color: #374151;"><?= date('M d, Y', strtotime($po['received_date'])) ?></span>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endif; ?>
                             </td>
                             <td>
                                 <span class="status-badge status-<?= strtolower($po['status']) ?>">
@@ -1027,6 +1016,16 @@ $verifier_name = 'Marilou L. Suarez';
             // attempt) — showing it implies delivered when it is not.
             const rawDate = (item.received_date && String(item.received_date).indexOf('0000') !== 0) ? String(item.received_date) : '';
             const recvDateStr = (isRecv && rawDate) ? new Date(rawDate).toLocaleDateString() : '';
+            // Per-line receiver: whoever clicked "Receive Items" on this row.
+            // Older rows may store a raw value with no matching user, so fall
+            // back to whatever text is stored rather than showing a blank cell.
+            const recvByName = (item.item_received_by_name && item.item_received_by_name !== 'Unknown')
+                ? String(item.item_received_by_name)
+                : (isRecv && item.item_received_by && String(item.item_received_by) !== '0' ? String(item.item_received_by) : '');
+            const recvByRole = (isRecv && item.item_received_by_role) ? String(item.item_received_by_role) : '';
+            const recvByCell = isRecv && recvByName
+                ? `<div style="line-height:1.2;"><strong style="font-size:0.82rem;">${recvByName}</strong>${recvByRole ? `<br><small class="text-muted" style="font-size:0.72rem;">${recvByRole}</small>` : ''}</div>`
+                : '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>';
             itemsHtml += `
                 <tr>
                     <td>${item.item_number}</td>
@@ -1035,6 +1034,7 @@ $verifier_name = 'Marilou L. Suarez';
                     <td>₱${parseFloat(item.unit_cost).toFixed(2)}</td>
                     <td>₱${parseFloat(item.line_total).toFixed(2)}</td>
                     <td>${recvDateStr ? `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e9ecef;color:#212529;font-size:0.82rem;border:1px solid #ced4da;">${recvDateStr}</span>` : '<span style="color:#6c757d;font-size:0.85rem;">Not received</span>'}</td>
+                    <td>${recvByCell}</td>
                     <td>
                         ${isRecv ? `
                             <span class="badge bg-success"><i class="fas fa-check"></i> Already Received</span>
@@ -1060,7 +1060,6 @@ $verifier_name = 'Marilou L. Suarez';
                         <p><strong>Payment Method:</strong> ${po.payment_method || 'N/A'}</p>
                         ${po.status === 'Received' || po.received_date ? `
                             <p><strong>Received Date:</strong> ${po.received_date ? new Date(po.received_date).toLocaleString() : 'N/A'}</p>
-                            <p><strong>Received By:</strong> ${po.receiver_name ? `${po.receiver_name} ${po.receiver_role ? `(${po.receiver_role})` : ''}` : (po.received_by || 'N/A')}</p>
                         ` : ''}
                     </div>
                     <div class="col-md-6">
@@ -1082,13 +1081,14 @@ $verifier_name = 'Marilou L. Suarez';
                             <th>Unit Cost</th>
                             <th>Total</th>
                             <th>Received Date</th>
+                            <th>Received By</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${itemsHtml}
                         <tr style="background-color: var(--primary-green); color: white; font-weight: bold;">
-                            <td colspan="4" style="text-align: right;">GRAND TOTAL:</td>
+                            <td colspan="5" style="text-align: right;">GRAND TOTAL:</td>
                             <td>₱${grandTotal.toFixed(2)}</td>
                             <td></td>
                             <td></td>
