@@ -1,4 +1,14 @@
 <?php
+// Always return JSON, even on PHP warnings/notices that would corrupt fetch().json()
+ob_start();
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'message' => 'PHP fatal: ' . $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line']]);
+    }
+});
 include '../includes/auth.php';
 include '../includes/db.php';
 
@@ -44,7 +54,7 @@ $location_col_sql = po_location_column_exists($conn) ? ', location' : '';
 $item_stmt = $conn->prepare(
     "SELECT poi_id, po_id, item_description, quantity, unit_cost{$location_col_sql}
      FROM purchase_order_items
-     WHERE poi_id = ? AND is_received = 0
+     WHERE poi_id = ? AND COALESCE(is_received, 0) = 0
      LIMIT 1"
 );
 $item_stmt->bind_param("i", $poi_id);
@@ -76,21 +86,30 @@ $po_res = $po_stmt->get_result();
 $po = ($po_res && $po_res->num_rows > 0) ? $po_res->fetch_assoc() : ['po_id' => $item['po_id'], 'po_number' => ''];
 $po_stmt->close();
 
-$stmt = $conn->prepare("UPDATE purchase_order_items SET is_received = 1, received_date = ? WHERE poi_id = ? AND is_received = 0");
+$stmt = $conn->prepare("UPDATE purchase_order_items SET is_received = 1, received_date = ?, received_by = ? WHERE poi_id = ? AND COALESCE(is_received, 0) = 0");
 
 if (!$stmt) {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $conn->error]);
     exit;
 }
 
-$stmt->bind_param("si", $received_date, $poi_id);
+$uid_str = (string)($user_id ?? 0);
+    $stmt->bind_param("ssi", $received_date, $uid_str, $poi_id);
 
 if ($stmt->execute()) {
-    // Post the received quantity into inventory so it becomes searchable.
+    // Post the received quantity into inventory FIRST so it becomes searchable.
+    // If stock fails, roll the flag back so the line stays Pending, not stranded Received.
     if (!function_exists('po_post_item_to_inventory')) {
         require_once __DIR__ . '/../includes/po_inventory_helper.php';
     }
     $stock = po_post_item_to_inventory($conn, $po, $item, $target, $user_id, $received_date);
+
+    if (($stock['status'] ?? '') === 'error') {
+        $rb = $conn->prepare("UPDATE purchase_order_items SET is_received = 0, received_date = NULL, received_by = NULL WHERE poi_id = ?");
+        if ($rb) { $rb->bind_param("i", $poi_id); $rb->execute(); $rb->close(); }
+        echo json_encode(['success' => false, 'message' => 'Stock failed (' . ($stock['target'] ?? $target) . '): ' . $stock['message']]);
+        exit;
+    }
 
     // If all items on this PO are now received, update the PO status to Received
     $chk_po = $conn->prepare("SELECT COUNT(*) AS total_items, SUM(CASE WHEN is_received = 1 THEN 1 ELSE 0 END) AS received_items FROM purchase_order_items WHERE po_id = ?");
