@@ -11,6 +11,7 @@ register_shutdown_function(function () {
 });
 include '../includes/auth.php';
 include '../includes/db.php';
+require_once __DIR__ . '/../includes/qrcode.php';
 
 header('Content-Type: application/json');
 
@@ -52,7 +53,7 @@ $user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? null;
 $location_col_sql = po_location_column_exists($conn) ? ', location' : '';
 
 $item_stmt = $conn->prepare(
-    "SELECT poi_id, po_id, item_description, quantity, unit_cost{$location_col_sql}
+    "SELECT poi_id, po_id, item_number, item_description, quantity, unit_cost{$location_col_sql}
      FROM purchase_order_items
      WHERE poi_id = ? AND COALESCE(is_received, 0) = 0
      LIMIT 1"
@@ -130,10 +131,42 @@ if ($stmt->execute()) {
         }
     }
 
+    // ── Generate the per-item QR code now that the line is received ──────
+    // The PNG is stored in purchase_order_items.qr_code and can be shown later
+    // via view_item_qr.php. A failure here never undoes the successful receive —
+    // the view endpoint regenerates on demand if the BLOB is missing.
+    $item_qr_url = '';
+    try {
+        $item_payload = json_encode([
+            'type'      => 'PO_ITEM',
+            'po_number' => (string)($po['po_number'] ?? ''),
+            'item'      => (string)($item['item_number'] ?? ''),
+            'desc'      => (string)($item['item_description'] ?? ''),
+            'qty'       => (string)($item['quantity'] ?? ''),
+            'unit_cost' => (string)($item['unit_cost'] ?? ''),
+            'received'  => $received_date,
+        ], JSON_UNESCAPED_UNICODE);
+        $item_qr = new QrCode($item_payload, QrCode::ECC_MEDIUM);
+        $item_png = $item_qr->toPng(4, 4);
+        $qrs = $conn->prepare("UPDATE purchase_order_items SET qr_code = ? WHERE poi_id = ?");
+        if ($qrs) {
+            $null = null;
+            $qrs->bind_param('bi', $null, $poi_id);
+            $qrs->send_long_data(0, $item_png);
+            if ($qrs->execute()) {
+                $item_qr_url = '../actions/view_item_qr.php?id=' . $poi_id;
+            }
+            $qrs->close();
+        }
+    } catch (Throwable $e) {
+        $item_qr_url = '';
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Item marked as received successfully. ' . $stock['message'],
         'stock' => $stock,
+        'item_qr_url' => $item_qr_url,
     ]);
 } else {
     echo json_encode(['success' => false, 'message' => 'Database error: ' . $stmt->error]);
