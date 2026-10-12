@@ -92,15 +92,9 @@ try {
             $table_rows .= '<td><span class="badge bg-' . $badge_class . '">' . ucfirst($stock_level) . '</span></td>';
             $table_rows .= '<td>';
             
-            // Stock movement buttons
-            $table_rows .= '<div class="half-split btn btn-sm" title="Stock In / Out">';
-            $table_rows .= '<span class="half plus" onclick="stockIn(' . (int)$row['inventory_id'] . '); event.stopPropagation();">';
-            $table_rows .= '<i class="fas fa-plus"></i>';
-            $table_rows .= '</span>';
-            $table_rows .= '<span class="half minus" onclick="stockOut(' . (int)$row['inventory_id'] . '); event.stopPropagation();">';
-            $table_rows .= '<i class="fas fa-minus"></i>';
-            $table_rows .= '</span>';
-            $table_rows .= '</div>';
+            // Stock movement buttons (styled to match the other row action buttons)
+            $table_rows .= '<button class="btn btn-sm btn-outline-success me-1" title="Stock In" onclick="stockIn(' . (int)$row['inventory_id'] . '); event.stopPropagation();"><i class="fas fa-plus"></i></button> ';
+            $table_rows .= '<button class="btn btn-sm btn-outline-warning me-1" title="Stock Out" onclick="stockOut(' . (int)$row['inventory_id'] . '); event.stopPropagation();"><i class="fas fa-minus"></i></button> ';
             
             // Edit button
             $table_rows .= '<button class="btn btn-sm btn-info" title="Edit" onclick="openEditInventoryModal(';
