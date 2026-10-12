@@ -133,6 +133,38 @@ $stock_logs_result = $conn->query($stock_logs_sql);
 $suppliers_sql = "SELECT supplier_id, supplier_name FROM supplier WHERE status = 'Active' ORDER BY supplier_name";
 $suppliers_result = $conn->query($suppliers_sql);
 
+// Get fire extinguishers (joined with supplier name) for the Fire Extinguisher tab
+$fire_extinguishers = [];
+$is_purchasing = in_array(strtolower($user_type), ['purchasing officer', 'purchasing staff', 'purchasingstaff'], true);
+$fe_stats = ['total' => 0, 'due_inspection' => 0, 'expired' => 0, 'maintenance' => 0];
+$fe_sql = "SELECT fe.*, s.supplier_name
+           FROM fire_extinguishers fe
+           LEFT JOIN supplier s ON fe.supplier_id = s.supplier_id
+           ORDER BY fe.date_created DESC, fe.fire_extinguisher_id DESC";
+if ($fe_res = $conn->query($fe_sql)) {
+    while ($fe = $fe_res->fetch_assoc()) {
+        $fire_extinguishers[] = $fe;
+        $fe_stats['total']++;
+        // Due for inspection: next monthly/annual due on or before today (and still In Service)
+        $today = date('Y-m-d');
+        $dueMonthly = !empty($fe['next_monthly_due']) && $fe['next_monthly_due'] <= $today;
+        $dueAnnual  = !empty($fe['next_annual_due']) && $fe['next_annual_due'] <= $today;
+        if (($dueMonthly || $dueAnnual) && strtolower((string)$fe['status']) === 'in service') {
+            $fe_stats['due_inspection']++;
+        }
+        // Expired: expiration date passed
+        if (!empty($fe['expiration_date']) && $fe['expiration_date'] < $today) {
+            $fe_stats['expired']++;
+        }
+        // Under maintenance / out of service
+        $st = strtolower((string)$fe['status']);
+        if ($st === 'under maintenance' || $st === 'out of service') {
+            $fe_stats['maintenance']++;
+        }
+    }
+    $fe_res->free();
+}
+
 // Build School Year options for dropdowns (last 10 years)
 $currYear = (int)date('Y');
 $minYear = $currYear - 10;
@@ -989,6 +1021,188 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 color: #8b5cf6;
                 border-color: #dee2e6;
             }
+            } /* end @media (max-width: 768px) */
+
+            /* ── Property Inventory Tabs ── */
+            .prop-inv-tabs {
+                display: flex;
+                gap: 6px;
+                padding: 6px;
+                margin-bottom: 20px;
+                background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+                border-radius: 10px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+            }
+
+            /* Ensure an active tab pane is always visible (no opacity-transition trap) */
+            .tab-content > .tab-pane.active {
+                display: block;
+                opacity: 1;
+            }
+
+            .prop-inv-tabs .nav-link {
+                display: inline-flex;
+                align-items: center;
+                color: rgba(255, 255, 255, 0.82);
+                font-weight: 600;
+                font-size: 0.95rem;
+                padding: 10px 22px;
+                border: none;
+                border-radius: 8px;
+                background: transparent;
+                transition: all .25s ease;
+            }
+
+            .prop-inv-tabs .nav-link:hover {
+                color: #fff;
+                background: rgba(255, 255, 255, 0.12);
+            }
+
+            .prop-inv-tabs .nav-link.active {
+                color: var(--text-dark);
+                background: var(--accent-orange);
+                box-shadow: 0 3px 10px rgba(234, 202, 38, 0.45);
+            }
+
+            /* ── Fire Extinguisher pane ── */
+            .fe-hero {
+                background: linear-gradient(135deg, var(--primary-green) 0%, #0a4f28 100%);
+                color: #fff;
+                border-radius: 12px;
+                padding: 28px 30px;
+                margin-bottom: 20px;
+                box-shadow: 0 8px 25px rgba(7, 59, 29, 0.18);
+                display: flex;
+                align-items: center;
+                gap: 22px;
+            }
+
+            .fe-hero .fe-hero-icon {
+                width: 72px;
+                height: 72px;
+                flex-shrink: 0;
+                border-radius: 50%;
+                background: var(--accent-orange);
+                color: var(--primary-green);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 2rem;
+                box-shadow: 0 6px 18px rgba(234, 202, 38, 0.5);
+            }
+
+            .fe-hero h2 {
+                font-size: 1.5rem;
+                font-weight: 700;
+                margin: 0 0 4px;
+            }
+
+            .fe-hero p {
+                margin: 0;
+                opacity: .9;
+                font-size: .92rem;
+            }
+
+            .fe-stats {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+
+            .fe-stat-card {
+                background: #fff;
+                border-radius: 10px;
+                padding: 18px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                transition: transform .25s ease;
+            }
+
+            .fe-stat-card:hover {
+                transform: translateY(-3px);
+            }
+
+            .fe-stat-icon {
+                width: 46px;
+                height: 46px;
+                border-radius: 10px;
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #fff;
+                font-size: 1.15rem;
+            }
+
+            .fe-stat-icon.green {
+                background: linear-gradient(135deg, #28a745, #20c997);
+            }
+
+            .fe-stat-icon.orange {
+                background: linear-gradient(135deg, #f39c12, #e67e22);
+            }
+
+            .fe-stat-icon.red {
+                background: linear-gradient(135deg, #e74c3c, #c0392b);
+            }
+
+            .fe-stat-icon.blue {
+                background: linear-gradient(135deg, #4a90e2, #357abd);
+            }
+
+            .fe-stat-number {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: var(--text-dark);
+                line-height: 1;
+            }
+
+            .fe-stat-label {
+                font-size: .8rem;
+                color: #666;
+                margin-top: 3px;
+            }
+
+            .fe-table-wrap {
+                background: #fff;
+                border-radius: 10px;
+                overflow: hidden;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+            }
+
+            .fe-table-head {
+                background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+                color: #fff;
+                padding: 14px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .fe-table-head h3 {
+                margin: 0;
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+
+            .fe-add-btn {
+                background: var(--accent-orange);
+                color: var(--text-dark);
+                border: none;
+                padding: 7px 16px;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: .85rem;
+                transition: all .25s ease;
+            }
+
+            .fe-add-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(234, 202, 38, 0.5);
+            }
     </style>
 
     <!-- Sidebar -->
@@ -996,14 +1210,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
     <!-- Main Content -->
     <div class="main-content">
-        <div class="content-header">
-            <h1>Property Inventory Management</h1>
-            <p>Track supplies, monitor stock levels, and manage inventory movements</p>
-            <?php if (strtolower($user_type) == 'purchasing officer' || strtolower($user_type) == 'admin' || strtolower($user_type) == 'purchasing staff' || strtolower($user_type) == 'purchasingstaff'): ?>
-                <button class="btn" style="background-color: var(--accent-orange);" onclick="window.location.href='received_items.php'">Back to received page</button>
-            <?php endif; ?>
-        </div>
-
         <!-- Success/Error Messages -->
         <?php if (isset($_SESSION['success'])): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -1044,45 +1250,71 @@ if ($categories_result && $categories_result->num_rows > 0) {
             </div>
         <?php endif; ?>
 
-        <!-- Statistics Cards -->
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-icon items">
-                    <i class="fas fa-boxes"></i>
-                </div>
-                <div class="stat-number"><?= $total_items ?></div>
-                <div class="stat-label">Total Items</div>
-            </div>
+        <!-- Property Inventory Tabs -->
+        <ul class="nav prop-inv-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-property" data-bs-toggle="tab" data-bs-target="#pane-property" type="button" role="tab" aria-controls="pane-property" aria-selected="true">
+                    <i class="fas fa-boxes me-2"></i>Property Inventory
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-fire" data-bs-toggle="tab" data-bs-target="#pane-fire" type="button" role="tab" aria-controls="pane-fire" aria-selected="false">
+                    <i class="fas fa-fire-extinguisher me-2"></i>Fire Extinguisher
+                </button>
+            </li>
+        </ul>
 
-            <div class="stat-card clickable" data-bs-toggle="modal" data-bs-target="#lowStockModal" style="cursor: pointer;" title="Click to view low stock items">
-                <div class="stat-icon low-stock">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div class="stat-number"><?= $low_stock_count ?></div>
-                <div class="stat-label">Low Stock Items</div>
-                <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
-            </div>
+        <div class="tab-content">
+            <div class="tab-pane show active" id="pane-property" role="tabpanel" aria-labelledby="tab-property">
 
-            <div class="stat-card clickable" data-bs-toggle="modal" data-bs-target="#outOfStockModal" style="cursor: pointer;" title="Click to view out of stock items">
-                <div class="stat-icon out-of-stock">
-                    <i class="fas fa-times-circle"></i>
+                <!-- Property Inventory Header (shown only on this tab) -->
+                <div class="content-header">
+                    <h1>Property Inventory Management</h1>
+                    <p>Track supplies, monitor stock levels, and manage inventory movements</p>
+                    <?php if (strtolower($user_type) == 'purchasing officer' || strtolower($user_type) == 'admin' || strtolower($user_type) == 'purchasing staff' || strtolower($user_type) == 'purchasingstaff'): ?>
+                        <button class="btn" style="background-color: var(--accent-orange);" onclick="window.location.href='received_items.php'">Back to received page</button>
+                    <?php endif; ?>
                 </div>
-                <div class="stat-number"><?= $out_of_stock_count ?></div>
-                <div class="stat-label">Out of Stock</div>
-                <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
-            </div>
 
-            <div class="stat-card">
-                <div class="stat-icon movements">
-                    <i class="fas fa-exchange-alt"></i>
+                <!-- Statistics Cards (shown only on this tab) -->
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-icon items">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                        <div class="stat-number"><?= $total_items ?></div>
+                        <div class="stat-label">Total Items</div>
+                    </div>
+
+                    <div class="stat-card clickable" data-bs-toggle="modal" data-bs-target="#lowStockModal" style="cursor: pointer;" title="Click to view low stock items">
+                        <div class="stat-icon low-stock">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-number"><?= $low_stock_count ?></div>
+                        <div class="stat-label">Low Stock Items</div>
+                        <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
+                    </div>
+
+                    <div class="stat-card clickable" data-bs-toggle="modal" data-bs-target="#outOfStockModal" style="cursor: pointer;" title="Click to view out of stock items">
+                        <div class="stat-icon out-of-stock">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                        <div class="stat-number"><?= $out_of_stock_count ?></div>
+                        <div class="stat-label">Out of Stock</div>
+                        <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon movements">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="stat-number"><?= $stock_logs_result ? $stock_logs_result->num_rows : 0 ?></div>
+                        <div class="stat-label">Recent Movements</div>
+                    </div>
                 </div>
-                <div class="stat-number"><?= $stock_logs_result ? $stock_logs_result->num_rows : 0 ?></div>
-                <div class="stat-label">Recent Movements</div>
-            </div>
-        </div>
 
-        <!-- Inventory Table -->
-        <div class="table-container" id="inventory-items">
+                <!-- Inventory Table -->
+                <div class="table-container" id="inventory-items">
             <div class="table-header p-2">
                 <h3>Property Items</h3>
                 <div class="d-flex align-items-end gap-1">
@@ -2374,9 +2606,487 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <button type="submit" class="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
+                    </div><!-- /.modal-content -->
+                </div><!-- /.modal-dialog -->
+            </div><!-- /.modal (editInventoryModal) -->
+            </div><!-- /#inventory-items (property wrapper) -->
+            </div><!-- /.tab-pane-property -->
+
+            <!-- ── Fire Extinguisher Tab ── -->
+            <div class="tab-pane" id="pane-fire" role="tabpanel" aria-labelledby="tab-fire">
+
+                <!-- Hero -->
+                <div class="fe-hero">
+                    <div class="fe-hero-icon"><i class="fas fa-fire-extinguisher"></i></div>
+                    <div>
+                        <h2>Fire Extinguisher Management</h2>
+                        <p>Track, inspect, and maintain all fire extinguishers across campus facilities.</p>
                     </div>
                 </div>
+
+                <!-- Stats -->
+                <div class="fe-stats">
+                    <div class="fe-stat-card">
+                        <div class="fe-stat-icon green"><i class="fas fa-fire-extinguisher"></i></div>
+                        <div>
+                            <div class="fe-stat-number"><?= (int)$fe_stats['total'] ?></div>
+                            <div class="fe-stat-label">Total Units</div>
+                        </div>
+                    </div>
+                    <div class="fe-stat-card">
+                        <div class="fe-stat-icon orange"><i class="fas fa-clipboard-check"></i></div>
+                        <div>
+                            <div class="fe-stat-number"><?= (int)$fe_stats['due_inspection'] ?></div>
+                            <div class="fe-stat-label">Due for Inspection</div>
+                        </div>
+                    </div>
+                    <div class="fe-stat-card">
+                        <div class="fe-stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div>
+                            <div class="fe-stat-number"><?= (int)$fe_stats['expired'] ?></div>
+                            <div class="fe-stat-label">Expired</div>
+                        </div>
+                    </div>
+                    <div class="fe-stat-card">
+                        <div class="fe-stat-icon blue"><i class="fas fa-wrench"></i></div>
+                        <div>
+                            <div class="fe-stat-number"><?= (int)$fe_stats['maintenance'] ?></div>
+                            <div class="fe-stat-label">Under Maintenance</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="fe-table-wrap">
+                    <div class="fe-table-head">
+                        <h3>Fire Extinguisher Records</h3>
+                        <?php if (!$is_purchasing): ?>
+                            <button class="fe-add-btn" type="button" data-bs-toggle="modal" data-bs-target="#addFireExtinguisherModal">
+                                <i class="fas fa-plus me-1"></i>Add Extinguisher
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Item No.</th>
+                                    <th>Serial No.</th>
+                                    <th>Manufacturer</th>
+                                    <th>Type</th>
+                                    <th>Capacity</th>
+                                    <th>Location</th>
+                                    <th>Next Inspection</th>
+                                    <th>Expiry Date</th>
+                                    <th>Status</th>
+                                    <?php if (!$is_purchasing): ?>
+                                        <th style="width:110px;">Actions</th>
+                                    <?php endif; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($fire_extinguishers)): ?>
+                                    <?php foreach ($fire_extinguishers as $fe):
+                                        $fe_status = (string)$fe['status'];
+                                        $fe_status_lc = strtolower($fe_status);
+                                        if ($fe_status_lc === 'in service') {
+                                            $fe_badge = 'success';
+                                        } elseif ($fe_status_lc === 'under maintenance') {
+                                            $fe_badge = 'warning';
+                                        } elseif ($fe_status_lc === 'out of service' || $fe_status_lc === 'expired') {
+                                            $fe_badge = 'danger';
+                                        } else {
+                                            $fe_badge = 'secondary';
+                                        }
+                                        $fe_next = !empty($fe['next_monthly_due']) ? $fe['next_monthly_due'] : ($fe['next_annual_due'] ?? '');
+                                        $fe_loc = trim(($fe['building'] ?? '') . (!empty($fe['building']) && !empty($fe['location']) ? ' – ' : '') . ($fe['location'] ?? ''));
+                                    ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($fe['item_number'] ?? '') ?></strong></td>
+                                            <td><?= htmlspecialchars($fe['serial_number'] ?? '') ?></td>
+                                            <td><?= htmlspecialchars($fe['manufacturer'] ?? '') ?></td>
+                                            <td><?= htmlspecialchars($fe['type_agent'] ?? '') ?></td>
+                                            <td><?= htmlspecialchars($fe['size_capacity'] ?? '') ?></td>
+                                            <td><?= htmlspecialchars($fe_loc) ?></td>
+                                            <td>
+                                                <?= !empty($fe_next) ? date('M d, Y', strtotime($fe_next)) : '<span class="text-muted">&mdash;</span>' ?>
+                                            </td>
+                                            <td>
+                                                <?= !empty($fe['expiration_date']) ? date('M d, Y', strtotime($fe['expiration_date'])) : '<span class="text-muted">&mdash;</span>' ?>
+                                            </td>
+                                            <td><span class="badge bg-<?= $fe_badge ?>"><?= htmlspecialchars($fe_status) ?></span></td>
+                                            <?php if (!$is_purchasing): ?>
+                                                <td>
+                                                    <button class="btn btn-sm btn-info" title="Edit"
+                                                        onclick='openEditFireExtinguisherModal(<?= json_encode($fe, JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_TAG | JSON_HEX_AMP) ?>)'>
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger ms-1" title="Delete"
+                                                        onclick="deleteFireExtinguisher(<?= (int)$fe['fire_extinguisher_id'] ?>, <?= htmlspecialchars(json_encode($fe['item_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>)">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            <?php endif; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="<?= $is_purchasing ? 9 : 10 ?>" class="text-center py-5">
+                                            <i class="fas fa-fire-extinguisher fa-3x mb-3" style="color:#073b1d; opacity:.35;"></i>
+                                            <p class="text-muted mb-0">No fire extinguishers registered yet. Click <strong>Add Extinguisher</strong> to get started.</p>
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div><!-- /.tab-pane-fire -->
+        </div><!-- /.tab-content -->
+
+        <!-- ── Add Fire Extinguisher Modal ── -->
+        <div class="modal fade" id="addFireExtinguisherModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #073b1d 0%, #0a4f28 100%); color:#fff;">
+                        <h5 class="modal-title"><i class="fas fa-fire-extinguisher me-2"></i>Add Fire Extinguisher</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="../actions/add_fire_extinguisher.php" method="POST">
+                        <div class="modal-body">
+                            <h6 class="text-uppercase text-muted mb-3">Identification</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Item No. <span class="text-danger">*</span></label>
+                                    <input type="text" name="item_number" class="form-control" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Serial No.</label>
+                                    <input type="text" name="serial_number" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Manufacturer</label>
+                                    <input type="text" name="manufacturer" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Model</label>
+                                    <input type="text" name="model" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Type / Agent</label>
+                                    <select name="type_agent" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>ABC Dry Chemical</option>
+                                        <option>CO2</option>
+                                        <option>Foam</option>
+                                        <option>Water</option>
+                                        <option>Wet Chemical</option>
+                                        <option>Clean Agent</option>
+                                        <option>Halotron</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Capacity</label>
+                                    <input type="text" name="size_capacity" class="form-control" placeholder="e.g. 10 lbs">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Rating</label>
+                                    <input type="text" name="rating" class="form-control" placeholder="e.g. 4A:80B:C">
+                                </div>
+                            </div>
+
+                            <h6 class="text-uppercase text-muted mb-3">Location</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Building</label>
+                                    <input type="text" name="building" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Floor</label>
+                                    <input type="text" name="floor" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Area</label>
+                                    <input type="text" name="area" class="form-control">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label">Specific Location</label>
+                                    <input type="text" name="location" class="form-control" placeholder="e.g. Near main entrance, left wall">
+                                </div>
+                            </div>
+
+                            <!-- ADD_MODAL_REST -->
+                            <h6 class="text-uppercase text-muted mb-3">Status &amp; Inspection</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Status <span class="text-danger">*</span></label>
+                                    <select name="status" class="form-select" required>
+                                        <option>In Service</option>
+                                        <option>Under Maintenance</option>
+                                        <option>Out of Service</option>
+                                        <option>Expired</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Pressure Status</label>
+                                    <select name="pressure_status" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Normal</option>
+                                        <option>Low</option>
+                                        <option>High</option>
+                                        <option>Overcharged</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Condition</label>
+                                    <select name="condition_status" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Good</option>
+                                        <option>Fair</option>
+                                        <option>Poor</option>
+                                        <option>Damaged</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Last Inspection Result</label>
+                                    <select name="last_inspection_result" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Pass</option>
+                                        <option>Fail</option>
+                                        <option>Pending</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Next Monthly Due</label>
+                                    <input type="date" name="next_monthly_due" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Next Annual Due</label>
+                                    <input type="date" name="next_annual_due" class="form-control">
+                                </div>
+                            </div>
+                            <!-- ADD_MODAL_PURCHASE -->
+                            <h6 class="text-uppercase text-muted mb-3">Purchase &amp; Assignment</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Date</label>
+                                    <input type="date" name="purchase_date" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Price</label>
+                                    <input type="number" step="0.01" name="purchase_price" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Expiration Date</label>
+                                    <input type="date" name="expiration_date" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Supplier</label>
+                                    <select name="supplier_id" class="form-select">
+                                        <option value="0">Select Supplier</option>
+                                        <?php
+                                        if ($suppliers_result) {
+                                            $suppliers_result->data_seek(0);
+                                            while ($supplier = $suppliers_result->fetch_assoc()):
+                                        ?>
+                                                <option value="<?= (int)$supplier['supplier_id'] ?>"><?= htmlspecialchars($supplier['supplier_name']) ?></option>
+                                        <?php
+                                            endwhile;
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Responsible Party</label>
+                                    <input type="text" name="responsible_party" class="form-control">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Notes</label>
+                                    <textarea name="notes" class="form-control" rows="2" placeholder="Optional notes..."></textarea>
+                                </div>
+                                <input type="hidden" name="receiver" value="Property Custodian">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Extinguisher</button>
+                        </div>
+                    </form>
+                </div>
             </div>
+        </div>
+
+        <!-- ── Edit Fire Extinguisher Modal ── -->
+        <div class="modal fade" id="editFireExtinguisherModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #073b1d 0%, #0a4f28 100%); color:#fff;">
+                        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Fire Extinguisher</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form action="../actions/edit_fire_extinguisher.php" method="POST">
+                        <input type="hidden" name="fire_extinguisher_id" id="fe_edit_id">
+                        <div class="modal-body">
+                            <h6 class="text-uppercase text-muted mb-3">Identification</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Item No. <span class="text-danger">*</span></label>
+                                    <input type="text" name="item_number" id="fe_edit_item_number" class="form-control" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Serial No.</label>
+                                    <input type="text" name="serial_number" id="fe_edit_serial_number" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Manufacturer</label>
+                                    <input type="text" name="manufacturer" id="fe_edit_manufacturer" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Model</label>
+                                    <input type="text" name="model" id="fe_edit_model" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Type / Agent</label>
+                                    <select name="type_agent" id="fe_edit_type_agent" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>ABC Dry Chemical</option>
+                                        <option>CO2</option>
+                                        <option>Foam</option>
+                                        <option>Water</option>
+                                        <option>Wet Chemical</option>
+                                        <option>Clean Agent</option>
+                                        <option>Halotron</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Capacity</label>
+                                    <input type="text" name="size_capacity" id="fe_edit_size_capacity" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Rating</label>
+                                    <input type="text" name="rating" id="fe_edit_rating" class="form-control">
+                                </div>
+                            </div>
+
+                            <h6 class="text-uppercase text-muted mb-3">Location</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Building</label>
+                                    <input type="text" name="building" id="fe_edit_building" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Floor</label>
+                                    <input type="text" name="floor" id="fe_edit_floor" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Area</label>
+                                    <input type="text" name="area" id="fe_edit_area" class="form-control">
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label">Specific Location</label>
+                                    <input type="text" name="location" id="fe_edit_location" class="form-control">
+                                </div>
+                            </div>
+                            <!-- EDIT_MODAL_REST -->
+                            <h6 class="text-uppercase text-muted mb-3">Status &amp; Inspection</h6>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Status <span class="text-danger">*</span></label>
+                                    <select name="status" id="fe_edit_status" class="form-select" required>
+                                        <option>In Service</option>
+                                        <option>Under Maintenance</option>
+                                        <option>Out of Service</option>
+                                        <option>Expired</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Pressure Status</label>
+                                    <select name="pressure_status" id="fe_edit_pressure_status" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Normal</option>
+                                        <option>Low</option>
+                                        <option>High</option>
+                                        <option>Overcharged</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Condition</label>
+                                    <select name="condition_status" id="fe_edit_condition_status" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Good</option>
+                                        <option>Fair</option>
+                                        <option>Poor</option>
+                                        <option>Damaged</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Last Inspection Result</label>
+                                    <select name="last_inspection_result" id="fe_edit_last_inspection_result" class="form-select">
+                                        <option value="">-- Select --</option>
+                                        <option>Pass</option>
+                                        <option>Fail</option>
+                                        <option>Pending</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Next Monthly Due</label>
+                                    <input type="date" name="next_monthly_due" id="fe_edit_next_monthly_due" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Next Annual Due</label>
+                                    <input type="date" name="next_annual_due" id="fe_edit_next_annual_due" class="form-control">
+                                </div>
+                            </div>
+                            <!-- EDIT_MODAL_PURCHASE -->
+                            <h6 class="text-uppercase text-muted mb-3">Purchase &amp; Assignment</h6>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Date</label>
+                                    <input type="date" name="purchase_date" id="fe_edit_purchase_date" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Purchase Price</label>
+                                    <input type="number" step="0.01" name="purchase_price" id="fe_edit_purchase_price" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Expiration Date</label>
+                                    <input type="date" name="expiration_date" id="fe_edit_expiration_date" class="form-control">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Supplier</label>
+                                    <select name="supplier_id" id="fe_edit_supplier_id" class="form-select">
+                                        <option value="0">Select Supplier</option>
+                                        <?php
+                                        if ($suppliers_result) {
+                                            $suppliers_result->data_seek(0);
+                                            while ($supplier = $suppliers_result->fetch_assoc()):
+                                        ?>
+                                                <option value="<?= (int)$supplier['supplier_id'] ?>"><?= htmlspecialchars($supplier['supplier_name']) ?></option>
+                                        <?php
+                                            endwhile;
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Responsible Party</label>
+                                    <input type="text" name="responsible_party" id="fe_edit_responsible_party" class="form-control">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Notes</label>
+                                    <textarea name="notes" id="fe_edit_notes" class="form-control" rows="2" placeholder="Optional notes..."></textarea>
+                                </div>
+                                <input type="hidden" name="receiver" value="Property Custodian">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
 
             <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -2613,6 +3323,74 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 alert('An error occurred while deleting the item.');
                             });
                     }
+                }
+
+                // ── Fire Extinguisher: open Edit modal and populate fields ──
+                function openEditFireExtinguisherModal(fe) {
+                    const set = (id, val) => {
+                        const el = document.getElementById(id);
+                        if (el) el.value = (val === null || val === undefined) ? '' : val;
+                    };
+                    // Truncate ISO datetimes (YYYY-MM-DD HH:MM:SS) to YYYY-MM-DD for date inputs
+                    const toDate = (val) => {
+                        if (!val || /^0000-00-00/.test(val)) return '';
+                        return String(val).substring(0, 10);
+                    };
+
+                    set('fe_edit_id', fe.fire_extinguisher_id);
+                    set('fe_edit_item_number', fe.item_number);
+                    set('fe_edit_serial_number', fe.serial_number);
+                    set('fe_edit_manufacturer', fe.manufacturer);
+                    set('fe_edit_model', fe.model);
+                    set('fe_edit_type_agent', fe.type_agent);
+                    set('fe_edit_size_capacity', fe.size_capacity);
+                    set('fe_edit_rating', fe.rating);
+                    set('fe_edit_building', fe.building);
+                    set('fe_edit_floor', fe.floor);
+                    set('fe_edit_area', fe.area);
+                    set('fe_edit_location', fe.location);
+                    set('fe_edit_status', fe.status);
+                    set('fe_edit_pressure_status', fe.pressure_status);
+                    set('fe_edit_condition_status', fe.condition_status);
+                    set('fe_edit_last_inspection_result', fe.last_inspection_result);
+                    set('fe_edit_next_monthly_due', toDate(fe.next_monthly_due));
+                    set('fe_edit_next_annual_due', toDate(fe.next_annual_due));
+                    set('fe_edit_purchase_date', toDate(fe.purchase_date));
+                    set('fe_edit_purchase_price', fe.purchase_price);
+                    set('fe_edit_expiration_date', toDate(fe.expiration_date));
+                    set('fe_edit_supplier_id', fe.supplier_id || 0);
+                    set('fe_edit_responsible_party', fe.responsible_party);
+                    set('fe_edit_notes', fe.notes);
+
+                    const modal = new bootstrap.Modal(document.getElementById('editFireExtinguisherModal'));
+                    modal.show();
+                }
+
+                // ── Fire Extinguisher: delete ──
+                function deleteFireExtinguisher(fireExtinguisherId, itemNumber) {
+                    if (!confirm(`Are you sure you want to delete fire extinguisher "${itemNumber}"? This action cannot be undone.`)) {
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('fire_extinguisher_id', fireExtinguisherId);
+
+                    fetch('../actions/delete_fire_extinguisher.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json().catch(() => ({ success: true, message: 'Deleted.' })))
+                        .then(data => {
+                            if (data && data.success === false) {
+                                alert('Error: ' + (data.message || 'Could not delete.'));
+                            } else {
+                                alert(data && data.message ? data.message : 'Fire extinguisher deleted successfully.');
+                                location.reload();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while deleting the fire extinguisher.');
+                        });
                 }
 
                 function deleteStockMovementLog(logId, itemName) {
