@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $pageTitle = 'Property Inventory Management';
 include '../includes/auth.php';
 include '../includes/db.php';
@@ -883,6 +883,30 @@ if ($categories_result && $categories_result->num_rows > 0) {
             width: 60px;
         }
 
+        /* Keep main inventory row action buttons on one line */
+        #inventoryTable td:last-child {
+            white-space: nowrap;
+        }
+
+        #inventoryTable td:last-child .row-actions {
+            display: inline-flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        #inventoryTable td:last-child .row-actions .btn {
+            flex: 0 0 auto;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+
+        /* Fallback when buttons render without wrapper (AJAX rows) */
+        #inventoryTable td:last-child .btn {
+            flex: 0 0 auto;
+        }
+
         @media (max-width: 1400px) {
             #acquiredSuppliesTable {
                 font-size: 0.8rem;
@@ -1349,6 +1373,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         <i class="fas fa-file-excel"></i>
                     </a>
                     <?php if (strtolower($user_type) != 'purchasing officer' && strtolower($user_type) != 'purchasing staff' && strtolower($user_type) != 'purchasingstaff'): ?>
+                        <button class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all property items"
+                                onclick="printStockQr('property')">
+                            <i class="fas fa-print"></i> Print QR
+                        </button>
                         <button class="btn btn-sm btn-add text-dark" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
                             <i class="fas fa-plus"></i> Add
                         </button>
@@ -1760,6 +1788,32 @@ if ($categories_result && $categories_result->num_rows > 0) {
             </div>
 
 
+            <!-- Stock Row QR Code Modal (View QR on a property row) -->
+            <div class="modal fade" id="rowQrModal" tabindex="-1" aria-labelledby="rowQrModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background: linear-gradient(135deg, #073b1d, #0a4f28); color: white;">
+                            <h5 class="modal-title" id="rowQrModalLabel"><i class="fas fa-qrcode me-2"></i>Item QR Code</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div id="rowQrModalSpinner" class="spinner-border text-success" style="display:none;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <img id="rowQrModalImage" src="" alt="Item QR Code"
+                                 style="max-width: 100%; height: auto; display: none; border: 1px solid #dee2e6; border-radius: 6px;">
+                            <div id="rowQrModalError" class="alert alert-danger mt-2" style="display:none; font-size:.85rem;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-success" id="rowQrPrintBtn">
+                                <i class="fas fa-print"></i> Print
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Property Inventory Table -->
 
             <div class="table-responsive">
@@ -1806,11 +1860,15 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td><?= $row['date_created'] ? date('M d, Y', strtotime($row['date_created'])) : 'N/A' ?></td>
                                         <?php if (strtolower($user_type) != 'purchasing officer' && strtolower($user_type) != 'purchasing staff' && strtolower($user_type) != 'purchasingstaff'): ?>
                                             <td>
+                                                <div class="row-actions">
                                                 <button class="btn btn-sm btn-outline-success me-1" title="Stock In" onclick="stockIn('<?= $row['inventory_id'] ?>')">
                                                     <i class="fas fa-plus"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-outline-warning me-1" title="Stock Out" onclick="stockOut('<?= $row['inventory_id'] ?>')">
                                                     <i class="fas fa-minus"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary me-1" title="View QR" onclick="viewRowQr('property', <?= (int)$row['inventory_id'] ?>)">
+                                                    <i class="fas fa-qrcode"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-info me-1" title="Edit"
                                                     onclick="openEditInventoryModal(
@@ -1838,6 +1896,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <button class="btn btn-sm btn-danger" title="Delete" onclick="deletePropertyItem(<?= (int)$row['inventory_id'] ?>, <?= htmlspecialchars(json_encode($row['item_name']), ENT_QUOTES, 'UTF-8') ?>)">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
+                                                </div>
                                             </td>
                                         <?php endif; ?>
                                     </tr>
@@ -3325,6 +3384,63 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     }
                 }
 
+                // ── Stock row QR codes (property / supply tables) ──────────────
+                let currentRowQrType = 'property';
+                let currentRowQrId = 0;
+
+                // Show the QR modal for one inventory/property row. The image
+                // endpoint streams the stored BLOB (or generates it on demand).
+                function viewRowQr(type, id) {
+                    const img = document.getElementById('rowQrModalImage');
+                    const spinner = document.getElementById('rowQrModalSpinner');
+                    const errorBox = document.getElementById('rowQrModalError');
+
+                    currentRowQrType = type;
+                    currentRowQrId = id;
+
+                    // Reset modal state.
+                    img.style.display = 'none';
+                    img.removeAttribute('src');
+                    errorBox.style.display = 'none';
+                    errorBox.textContent = '';
+                    spinner.style.display = 'block';
+
+                    const modalEl = document.getElementById('rowQrModal');
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    modal.show();
+
+                    // Cache-bust so a freshly regenerated BLOB is shown, not a stale one.
+                    img.src = '../actions/view_stock_qr.php?type=' + encodeURIComponent(type) +
+                        '&id=' + encodeURIComponent(id) + '&t=' + Date.now();
+                    img.onload = function() {
+                        spinner.style.display = 'none';
+                        img.style.display = 'block';
+                    };
+                    img.onerror = function() {
+                        spinner.style.display = 'none';
+                        errorBox.textContent = 'Could not load the QR code for this item.';
+                        errorBox.style.display = 'block';
+                    };
+                }
+
+                // Open the printable QR label sheet (all rows, or just one when
+                // an id is passed by the QR modal's Print button).
+                function printStockQr(type, id) {
+                    let url = 'print_stock_qr.php?type=' + encodeURIComponent(type);
+                    if (id) url += '&id=' + encodeURIComponent(id);
+                    window.open(url, '_blank');
+                }
+
+                // Wire the modal Print button once (type/id captured on open).
+                document.addEventListener('DOMContentLoaded', function() {
+                    const printBtn = document.getElementById('rowQrPrintBtn');
+                    if (printBtn) {
+                        printBtn.addEventListener('click', function() {
+                            printStockQr(currentRowQrType, currentRowQrId);
+                        });
+                    }
+                });
+
                 // ── Fire Extinguisher: open Edit modal and populate fields ──
                 function openEditFireExtinguisherModal(fe) {
                     const set = (id, val) => {
@@ -3457,18 +3573,17 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 function setMovementType(type) {
                     $('#movement_type').val(type);
 
-                    // Remove active class from all movement buttons
-                    $('.movement-btn').removeClass('active btn-outline-success btn-outline-warning');
+                    const isIn = (type === 'IN');
 
-                    if (type === 'IN') {
-                        $('#stockInBtn').addClass('active');
-                        $('#stockInBtn').addClass('btn-outline-success');
-                        $('#stockOutBtn').removeClass('btn-outline-warning');
-                    } else {
-                        $('#stockOutBtn').addClass('active');
-                        $('#stockOutBtn').addClass('btn-outline-warning');
-                        $('#stockInBtn').removeClass('btn-outline-success');
-                    }
+                    // Highlight the selected button (solid + active) and dim the other one (outline)
+                    $('#stockInBtn')
+                        .toggleClass('active', isIn)
+                        .toggleClass('btn-success', isIn)
+                        .toggleClass('btn-outline-success', !isIn);
+                    $('#stockOutBtn')
+                        .toggleClass('active', !isIn)
+                        .toggleClass('btn-warning', !isIn)
+                        .toggleClass('btn-outline-warning', isIn);
                 }
 
                 function viewItem(inventoryId) {
@@ -3980,13 +4095,16 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '<td><span class="badge bg-' . ($stock_level == 'out' ? 'danger' : ($stock_level == 'critical' ? 'warning' : 'success')) . '">' . ucfirst($stock_level) . '</span></td>';
                     echo '<td>' . ($row['date_created'] ? date('M d, Y', strtotime($row['date_created'])) : 'N/A') . '</td>';
                     if (strtolower($user_type ?? '') != 'purchasing officer' && strtolower($user_type ?? '') != 'purchasing staff' && strtolower($user_type ?? '') != 'purchasingstaff') {
-                        echo '<td>';
+                        echo '<td><div class="row-actions">';
                         // Separate buttons for Stock In (+) and Stock Out (−)
                         echo '<button class="btn btn-sm btn-outline-success me-1" title="Stock In" onclick="stockIn(' . $row['inventory_id'] . ')">';
                         echo '<i class="fas fa-plus"></i>';
                         echo '</button> ';
                         echo '<button class="btn btn-sm btn-outline-warning me-1" title="Stock Out" onclick="stockOut(' . $row['inventory_id'] . ')">';
                         echo '<i class="fas fa-minus"></i>';
+                        echo '</button> ';
+                        echo '<button class="btn btn-sm btn-outline-secondary me-1" title="View QR" onclick="viewRowQr(\'property\', ' . (int)$row['inventory_id'] . ')">';
+                        echo '<i class="fas fa-qrcode"></i>';
                         echo '</button> ';
                         echo '<button class="btn btn-sm btn-info" title="Edit" onclick=\'openEditInventoryModal('
                             . (int)$row['inventory_id'] . ', '
@@ -4009,7 +4127,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             . json_encode($row['color'] ?? '')
                             . ')\'><i class="fas fa-edit"></i></button>';
                         echo '<button class="btn btn-sm btn-danger ms-1" title="Delete" onclick="deletePropertyItem(' . (int)$row['inventory_id'] . ', ' . htmlspecialchars(json_encode($row['item_name']), ENT_QUOTES, 'UTF-8') . ')"><i class="fas fa-trash"></i></button>';
-                        echo '</td>';
+                        echo '</div></td>';
                     }
                     echo '</tr>';
                 }
