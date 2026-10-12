@@ -585,39 +585,61 @@ if ($categories_result && $categories_result->num_rows > 0) {
             }
         }
 
-        .half-split {
-            display: inline-flex;
+        /* Movement Button Styles (shared pattern from property_inventory.php) */
+        .movement-btn {
+            transition: all 0.3s ease;
+            border-width: 2px;
+            font-weight: 600;
+            position: relative;
             overflow: hidden;
-            padding: 0;
-            border-radius: .25rem;
-            border: 1px solid rgba(0, 0, 0, .125);
-            margin-right: 0.25rem;
         }
 
-        .half-split .half {
-            width: 1.5rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-            cursor: pointer;
-            user-select: none;
-            padding: 0.2rem 0;
-            font-size: 0.7rem;
+        .movement-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
-        .half-split .plus {
-            background: #28a745;
-            color: #fff;
+        .movement-btn.active {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            border-width: 3px;
         }
 
-        .half-split .minus {
-            background: #ffc107;
-            color: #212529;
+        .movement-btn.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.2);
+            animation: pulse 2s infinite;
         }
 
-        .half-split .half+.half {
-            border-left: 1px solid rgba(0, 0, 0, .125);
+        @keyframes pulse {
+            0% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 0.6;
+            }
+
+            100% {
+                opacity: 0.3;
+            }
+        }
+
+        .movement-btn.btn-outline-success {
+            border-color: #198754;
+            color: #198754;
+            background-color: rgba(25, 135, 84, 0.1);
+        }
+
+        .movement-btn.btn-outline-warning {
+            border-color: #ffc107;
+            color: #856404;
+            background-color: rgba(255, 193, 7, 0.1);
         }
 
         /* Pagination Redesign to match image */
@@ -782,6 +804,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <a href="../actions/export_inventory.php" class="btn btn-sm btn-success ms-1" title="Export to Excel">
                                     <i class="fas fa-file-excel"></i>
                                 </a>
+                                <button type="button" class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all supplies"
+                                        onclick="printStockQr('supply')">
+                                    <i class="fas fa-print"></i> Print QR
+                                </button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -987,17 +1013,19 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         </td>
                                         <?php if (strtolower($user_type) != 'purchasing officer' && strtolower($user_type) != 'purchasing staff' && strtolower($user_type) != 'purchasingstaff'): ?>
                                             <td>
-                                                <div class="half-split btn btn-sm" title="Stock In / Out">
-                                                    <span class="half plus" onclick="stockIn(<?= (int)$row['inventory_id'] ?>); event.stopPropagation();">
-                                                        <i class="fas fa-plus"></i>
-                                                    </span>
-                                                    <span class="half minus" onclick="stockOut(<?= (int)$row['inventory_id'] ?>); event.stopPropagation();">
-                                                        <i class="fas fa-minus"></i>
-                                                    </span>
-                                                </div>
+                                                <button class="btn btn-sm btn-outline-success me-1" title="Stock In" onclick="stockIn(<?= (int)$row['inventory_id'] ?>); event.stopPropagation();">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-warning me-1" title="Stock Out" onclick="stockOut(<?= (int)$row['inventory_id'] ?>); event.stopPropagation();">
+                                                    <i class="fas fa-minus"></i>
+                                                </button>
                                                 <button class="btn btn-sm btn-info" title="Edit"
                                                     onclick="editInventoryItem(<?= (int)$row['inventory_id'] ?>, null)">
                                                     <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" title="View QR"
+                                                    onclick="viewRowQr('supply', <?= (int)$row['inventory_id'] ?>)">
+                                                    <i class="fas fa-qrcode"></i>
                                                 </button>
                                             </td>
                                         <?php endif; ?>
@@ -1261,8 +1289,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <td><?= htmlspecialchars($row['item_name']) ?></td>
                                             <td><?= htmlspecialchars($row['quantity']) ?></td>
                                             <td><?= htmlspecialchars($row['unit']) ?></td>
-                                            <td>₱ <?= htmlspecialchars($row['unit_price']) ?></td>
-                                            <td>₱ <?= htmlspecialchars($row['total_amount']) ?></td>
+                                            <td>â‚± <?= htmlspecialchars($row['unit_price']) ?></td>
+                                            <td>â‚± <?= htmlspecialchars($row['total_amount']) ?></td>
                                             <td>
                                                 <span class="badge bg-success">
                                                     <?= htmlspecialchars($row['status']) ?>
@@ -1864,11 +1892,41 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         </div>
                                     </div>
                                 </div>
+                                <!-- Close modal-body before modal-footer; leaving it open
+                                     makes the outer .modal div unclosed, which swallows
+                                     #rowQrModal into a display:none ancestor. -->
+                                </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                                     <button type="submit" class="btn btn-primary">Save Changes</button>
                                 </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock Row QR Code Modal (View QR on a supplies row) -->
+            <div class="modal fade" id="rowQrModal" tabindex="-1" aria-labelledby="rowQrModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background: linear-gradient(135deg, #073b1d, #0a4f28); color: white;">
+                            <h5 class="modal-title" id="rowQrModalLabel"><i class="fas fa-qrcode me-2"></i>Item QR Code</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <div id="rowQrModalSpinner" class="spinner-border text-success" style="display:none;" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <img id="rowQrModalImage" src="" alt="Item QR Code"
+                                 style="max-width: 100%; height: auto; display: none; border: 1px solid #dee2e6; border-radius: 6px;">
+                            <div id="rowQrModalError" class="alert alert-danger mt-2" style="display:none; font-size:.85rem;"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-success" id="rowQrPrintBtn">
+                                <i class="fas fa-print"></i> Print
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1884,6 +1942,156 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 // ANCHOR: API configuration for stock movements
                 var API_BASE_URL = '<?= $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) ?>';
                 console.log('Server-generated API base URL:', API_BASE_URL);
+
+                // â”€â”€ QR debug helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                // Collects every JS error/unhandled rejection so the QR button
+                // debug output can show what actually broke.
+                window.__qrDebugLog = [];
+                function qrDebugLog(entry) {
+                    const stamp = new Date().toISOString();
+                    const item = '[' + stamp + '] ' + entry;
+                    window.__qrDebugLog.push(item);
+                    console.warn('[QR DEBUG] ' + entry);
+                }
+                window.addEventListener('error', function(e) {
+                    qrDebugLog('Page error: ' + (e.message || e.type) +
+                        ' @ ' + (e.filename || '') + ':' + (e.lineno || '') +
+                        (e.error && e.error.stack ? ' | ' + e.error.stack : ''));
+                });
+                window.addEventListener('unhandledrejection', function(e) {
+                    qrDebugLog('Unhandled promise rejection: ' +
+                        (e.reason && e.reason.stack ? e.reason.stack : e.reason));
+                });
+
+                // Render an error (and its debug details) inside the QR modal.
+                function showQrError(message, details) {
+                    const spinner = document.getElementById('rowQrModalSpinner');
+                    const img = document.getElementById('rowQrModalImage');
+                    const errorBox = document.getElementById('rowQrModalError');
+                    if (spinner) spinner.style.display = 'none';
+                    if (img) img.style.display = 'none';
+                    if (errorBox) {
+                        errorBox.innerHTML = '<strong>QR Debug Error</strong><br>' +
+                            message.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+                            (details ? '<br><small style="word-break:break-all;">' +
+                                String(details).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</small>' : '');
+                        errorBox.style.display = 'block';
+                    }
+                }
+
+                // â”€â”€ Stock row QR codes (property / supply tables) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                let currentRowQrType = 'supply';
+                let currentRowQrId = 0;
+
+                // Show the QR modal for one inventory/property row. The image
+                // endpoint streams the stored BLOB (or generates it on demand).
+                function viewRowQr(type, id) {
+                    qrDebugLog('viewRowQr called: type=' + type + ', id=' + id);
+
+                    try {
+                        const img = document.getElementById('rowQrModalImage');
+                        const spinner = document.getElementById('rowQrModalSpinner');
+                        const errorBox = document.getElementById('rowQrModalError');
+                        const modalEl = document.getElementById('rowQrModal');
+
+                        if (!img || !spinner || !errorBox || !modalEl) {
+                            qrDebugLog('Missing modal DOM: img=' + !!img + ', spinner=' + !!spinner +
+                                ', errorBox=' + !!errorBox + ', modalEl=' + !!modalEl);
+                            alert('[QR DEBUG] rowQrModal elements missing from page DOM.');
+                            return;
+                        }
+                        if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+                            qrDebugLog('bootstrap.Modal unavailable (Bootstrap JS not loaded).');
+                            alert('[QR DEBUG] Bootstrap JS is not loaded - modal cannot open.');
+                            return;
+                        }
+
+                        currentRowQrType = type;
+                        currentRowQrId = id;
+
+                        // Reset modal state.
+                        img.style.display = 'none';
+                        img.removeAttribute('src');
+                        errorBox.style.display = 'none';
+                        errorBox.textContent = '';
+                        spinner.style.display = 'block';
+
+                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.show();
+
+                        const url = '../actions/view_stock_qr.php?type=' + encodeURIComponent(type) +
+                            '&id=' + encodeURIComponent(id) + '&t=' + Date.now();
+                        const absoluteUrl = new URL(url, window.location.href).toString();
+                        qrDebugLog('Requesting QR image: ' + absoluteUrl);
+
+                        // Probe the endpoint first so HTTP errors are reported
+                        // with status code instead of a silently broken image.
+                        fetch(url, { credentials: 'same-origin' })
+                            .then(function(response) {
+                                qrDebugLog('Endpoint responded: status=' + response.status +
+                                    ' ' + response.statusText +
+                                    ', content-type=' + (response.headers.get('content-type') || 'n/a'));
+                                if (!response.ok) {
+                                    return response.text().then(function(body) {
+                                        showQrError('QR endpoint returned HTTP ' + response.status + '.',
+                                            absoluteUrl + ' | body: ' + body.substring(0, 300));
+                                    });
+                                }
+                                return response.blob().then(function(blob) {
+                                    qrDebugLog('Blob fetched: size=' + blob.size +
+                                        ', type=' + (blob.type || 'n/a'));
+                                    if (!blob.size) {
+                                        showQrError('QR endpoint returned an empty response (0 bytes).', absoluteUrl);
+                                        return;
+                                    }
+                                    if (img.src && img.src.indexOf('blob:') === 0) {
+                                        URL.revokeObjectURL(img.src);
+                                    }
+                                    img.src = URL.createObjectURL(blob);
+                                });
+                            })
+                            .catch(function(fetchError) {
+                                qrDebugLog('Fetch of QR endpoint failed: ' +
+                                    (fetchError && fetchError.stack ? fetchError.stack : fetchError));
+                                showQrError('Could not reach the QR endpoint: ' + fetchError.message, absoluteUrl);
+                            });
+
+                        img.onload = function() {
+                            spinner.style.display = 'none';
+                            img.style.display = 'block';
+                            qrDebugLog('QR image rendered: naturalWidth=' + img.naturalWidth +
+                                ', naturalHeight=' + img.naturalHeight);
+                        };
+                        img.onerror = function() {
+                            spinner.style.display = 'none';
+                            qrDebugLog('QR <img> onerror fired for: ' + (img.src || '(no src)'));
+                            showQrError('Could not load the QR code for this item.',
+                                'src=' + (img.src || '(none)'));
+                        };
+                    } catch (err) {
+                        qrDebugLog('Exception in viewRowQr: ' + (err && err.stack ? err.stack : err));
+                        showQrError('Unexpected error while opening the QR modal: ' + err.message,
+                            err.stack || '');
+                    }
+                }
+
+                // Open the printable QR label sheet (all rows, or just one when
+                // an id is passed by the QR modal's Print button).
+                function printStockQr(type, id) {
+                    let url = 'print_stock_qr.php?type=' + encodeURIComponent(type);
+                    if (id) url += '&id=' + encodeURIComponent(id);
+                    window.open(url, '_blank');
+                }
+
+                // Wire the modal Print button once (type/id captured on open).
+                document.addEventListener('DOMContentLoaded', function() {
+                    const printBtn = document.getElementById('rowQrPrintBtn');
+                    if (printBtn) {
+                        printBtn.addEventListener('click', function() {
+                            printStockQr(currentRowQrType, currentRowQrId);
+                        });
+                    }
+                });
 
                 $(document).ready(function() {
                     $('.supplier-select2').each(function() {
@@ -2007,10 +2215,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 function showSessionMessageAlert() {
                     if (sessionMessage) {
                         // Success message
-                        alert('✅ Success!\n\n' + sessionMessage);
+                        alert('âœ… Success!\n\n' + sessionMessage);
                     } else if (sessionError) {
                         // Error message
-                        alert('❌ Error!\n\n' + sessionError);
+                        alert('âŒ Error!\n\n' + sessionError);
                     }
                 }
 
@@ -2101,18 +2309,17 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 function setMovementType(type) {
                     $('#movement_type').val(type);
 
-                    // Remove active class from all movement buttons
-                    $('.movement-btn').removeClass('active btn-outline-success btn-outline-warning');
+                    const isIn = (type === 'IN');
 
-                    if (type === 'IN') {
-                        $('#stockInBtn').addClass('active');
-                        $('#stockInBtn').addClass('btn-outline-success');
-                        $('#stockOutBtn').removeClass('btn-outline-warning');
-                    } else {
-                        $('#stockOutBtn').addClass('active');
-                        $('#stockOutBtn').addClass('btn-outline-warning');
-                        $('#stockInBtn').removeClass('btn-outline-success');
-                    }
+                    // Highlight the selected button (solid + active) and dim the other one (outline)
+                    $('#stockInBtn')
+                        .toggleClass('active', isIn)
+                        .toggleClass('btn-success', isIn)
+                        .toggleClass('btn-outline-success', !isIn);
+                    $('#stockOutBtn')
+                        .toggleClass('active', !isIn)
+                        .toggleClass('btn-warning', !isIn)
+                        .toggleClass('btn-outline-warning', isIn);
                 }
 
                 function viewItem(inventoryId) {
@@ -2541,8 +2748,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 }
                             },
                             error: function(xhr, status, error) {
-                                console.error('AJAX Error:', status, error);
-                                alert('Error: Could not load inventory item data. Please check the console for details.');
+                                console.error('AJAX Error:', status, error, xhr && xhr.responseText ? xhr.responseText.slice(0, 1000) : '');
+                                var detail = xhr && xhr.responseText ? xhr.responseText.trim().replace(/^<[^>]*>/, '').slice(0, 400) : (error || status || 'Unknown error');
+                                alert('Error: Could not load inventory item data. Server said: ' + detail);
                             }
                         });
                     }, currentModalId ? 300 : 0);
@@ -2753,18 +2961,15 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '<td><span class="badge bg-' . ($stock_level == 'out' ? 'danger' : ($stock_level == 'critical' ? 'warning' : 'success')) . '">' . ucfirst($stock_level) . '</span></td>';
                     if (strtolower($user_type ?? '') != 'purchasing officer' && strtolower($user_type ?? '') != 'purchasing staff' && strtolower($user_type ?? '') != 'purchasingstaff') {
                         echo '<td>';
-                        echo '<div class="half-split btn btn-sm" title="Stock In / Out">
-                                <span class="half plus"  onclick="stockIn(' . (int)$row['inventory_id'] . '); event.stopPropagation();">
-                                    <i class="fas fa-plus"></i>
-                                </span>
-                                <span class="half minus" onclick="stockOut(' . (int)$row['inventory_id'] . '); event.stopPropagation();">
-                                    <i class="fas fa-minus"></i>
-                                </span>
-                            </div>';
+                        echo '<button class="btn btn-sm btn-outline-success me-1" title="Stock In" onclick="stockIn(' . (int)$row['inventory_id'] . '); event.stopPropagation();"><i class="fas fa-plus"></i></button>';
+                        echo '<button class="btn btn-sm btn-outline-warning me-1" title="Stock Out" onclick="stockOut(' . (int)$row['inventory_id'] . '); event.stopPropagation();"><i class="fas fa-minus"></i></button>';
 
                         echo ' <button class="btn btn-sm btn-info" 
                         title="Edit" 
                         onclick="editInventoryItem(' . (int)$row['inventory_id'] . ', null)"><i class="fas fa-edit"></i></button>';
+
+                        echo ' <button class="btn btn-sm btn-outline-secondary" title="View QR"
+                        onclick="viewRowQr(\'supply\', ' . (int)$row['inventory_id'] . ')"><i class="fas fa-qrcode"></i></button>';
 
                         echo '</td>';
                     }
