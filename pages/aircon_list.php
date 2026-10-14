@@ -1127,6 +1127,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
                                                             data-date-created="<?= htmlspecialchars($aircon['date_created'] ?? '', ENT_QUOTES) ?>">
@@ -1228,6 +1229,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
                                                             data-date-created="<?= htmlspecialchars($aircon['date_created'] ?? '', ENT_QUOTES) ?>"
@@ -1321,6 +1323,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
                                                             data-date-created="<?= htmlspecialchars($aircon['date_created'] ?? '', ENT_QUOTES) ?>"
@@ -1634,6 +1637,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     data-notes="<?= htmlspecialchars($row['notes'] ?? '', ENT_QUOTES) ?>"
                                                     data-purchase-price="<?= htmlspecialchars($row['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                     data-depreciated-value="<?= htmlspecialchars($row['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                    data-area="<?= htmlspecialchars($row['area'] ?? '', ENT_QUOTES) ?>"
                                                     data-receiver="<?= htmlspecialchars($row['receiver'] ?? '', ENT_QUOTES) ?>"
                                                     data-created-by="<?= htmlspecialchars($row['created_by'] ?? '', ENT_QUOTES) ?>"
                                                     data-date-created="<?= htmlspecialchars($row['date_created'] ?? '', ENT_QUOTES) ?>"
@@ -1651,6 +1655,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     <?= htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
+                                                    <?= htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
@@ -2002,6 +2007,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <label class="text-muted small">Location</label>
                                                 <p class="fw-bold mb-0" id="view_location">-</p>
                                             </div>
+                                            <div class="mb-3">
+                                                <label class="text-muted small">Area</label>
+                                                <p class="fw-bold mb-0" id="view_area">-</p>
+                                            </div>
                                             <div class="mb-0">
                                                 <label class="text-muted small">Status</label>
                                                 <p class="fw-bold mb-0" id="view_status">-</p>
@@ -2094,10 +2103,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <div class="col-md-4">
                                                     <label class="text-muted small">Depreciated Value</label>
                                                     <p class="fw-bold mb-0" id="view_depreciated_value">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Receiver</label>
-                                                    <p class="fw-bold mb-0" id="view_receiver">-</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -2650,6 +2655,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         const capacity = button.data('capacity') || '';
                         const serialNumber = button.data('serial-number') || '';
                         const location = button.data('location') || '';
+                        const area = button.data('area') || '';
                         const status = button.data('status') || '';
                         const purchaseDate = button.data('purchase-date') || '';
                         const warrantyExpiry = button.data('warranty-expiry') || '';
@@ -2671,7 +2677,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         // Call the viewAirconDetails function
                         viewAirconDetails(
                             airconId, itemNumber, brand, model, type, capacity, serialNumber,
-                            location, status, purchaseDate, warrantyExpiry, lastServiceDate,
+                            location, area, status, purchaseDate, warrantyExpiry, lastServiceDate,
                             maintenanceSchedule, supplierInfo, installationDate, energyEfficiency,
                             powerConsumption, notes, purchasePrice, depreciatedValue, receiver,
                             createdBy, dateCreated, picture
@@ -3637,7 +3643,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 });
 
                 // Function to view aircon details
-                function viewAirconDetails(airconId, itemNumber, brand, model, type, capacity, serialNumber, location, status,
+                function viewAirconDetails(airconId, itemNumber, brand, model, type, capacity, serialNumber, location, area, status,
                     purchaseDate, warrantyExpiry, lastServiceDate, maintenanceSchedule, supplierInfo, installationDate,
                     energyEfficiency, powerConsumption, notes, purchasePrice, depreciatedValue, receiver, createdBy, dateCreated, picture) {
 
@@ -3650,6 +3656,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     document.getElementById('view_capacity').textContent = capacity || 'N/A';
                     document.getElementById('view_serial_number').textContent = serialNumber || 'N/A';
                     document.getElementById('view_location').textContent = location || 'N/A';
+                    document.getElementById('view_area').textContent = area || 'N/A';
                     document.getElementById('view_status').textContent = status || 'N/A';
 
                     // Format dates
@@ -3674,7 +3681,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         maximumFractionDigits: 2
                     }) : '₱0.00';
 
-                    document.getElementById('view_receiver').textContent = receiver || 'N/A';
                     document.getElementById('view_created_by').textContent = createdBy || 'N/A';
                     document.getElementById('view_date_created').textContent = dateCreated ? formatDateTime(dateCreated) : 'N/A';
 
@@ -3908,6 +3914,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                        . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -3935,6 +3942,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                        . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                         . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -3979,7 +3987,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
         <script>
             // Add this to your aircon_list.php, preferably in the head section or before the closing body tag
             function openEditAirconModal(
-                aircon_id, item_name, category, brand, model, type, capacity, serial_number, location, status,
+                aircon_id, item_name, category, brand, model, type, capacity, serial_number, location, area, status,
                 purchase_date, warranty_expiry, last_service_date, maintenance_schedule, supplier_id,
                 installation_date, energy_efficient, power_consumption, notes, purchase_price, depreciated_value, picture
             ) {
@@ -4002,6 +4010,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 document.getElementById('edit_capacity').value = capacity || '';
                 document.getElementById('edit_serial_number').value = serial_number || '';
                 document.getElementById('edit_location').value = location || '';
+                document.getElementById('edit_area').value = area || '';
                 document.getElementById('edit_status').value = status || 'Working';
                 document.getElementById('edit_purchase_date').value = formatDate(purchase_date);
                 document.getElementById('edit_warranty_expiry').value = formatDate(warranty_expiry);
@@ -4188,6 +4197,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     <div class="col-md-3">
                                         <label class="form-label">Location</label>
                                         <input type="text" name="location" id="edit_location" class="form-control" placeholder="e.g., Room 101, Office">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Area</label>
+                                        <input type="text" name="area" id="edit_area" class="form-control" placeholder="e.g., Ground Floor, Annex">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Status</label>

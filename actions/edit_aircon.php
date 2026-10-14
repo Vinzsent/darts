@@ -18,6 +18,7 @@ $type                 = trim($_POST['type'] ?? '');
 $capacity             = trim($_POST['capacity'] ?? '');
 $serial_number        = trim($_POST['serial_number'] ?? '');
 $location             = trim($_POST['location'] ?? '');
+$area                 = trim($_POST['area'] ?? '');
 $status               = trim($_POST['status'] ?? 'Working');
 $purchase_date        = !empty($_POST['purchase_date']) ? $_POST['purchase_date'] : null;
 $warranty_expiry      = !empty($_POST['warranty_expiry']) ? $_POST['warranty_expiry'] : null;
@@ -93,6 +94,7 @@ $update_sql = "UPDATE aircons
                    capacity = ?,
                    serial_number = ?, 
                    location = ?, 
+                   area = ?, 
                    status = ?, 
                    purchase_date = ?, 
                    warranty_expiry = ?,
@@ -116,8 +118,8 @@ if (!$stmt) {
     exit();
 }
 
-// Bind parameters - 22 parameters
-$types = 'sssssssssssssissdsddsi';
+// Bind parameters - 23 parameters
+$types = 'sssssssssssssissdsddsis';
 $params = [
     $item_name,
     $category,
@@ -127,6 +129,7 @@ $params = [
     $capacity,
     $serial_number,
     $location,
+    $area,
     $status,
     $purchase_date,
     $warranty_expiry,
