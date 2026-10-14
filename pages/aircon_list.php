@@ -1589,11 +1589,11 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td data-label="Serial No."><?= htmlspecialchars($row['serial_number'] ?? 'N/A') ?></td>
                                         <td data-label="Location"><?= htmlspecialchars($row['location'] ?? 'N/A') ?></td>
                                         <td data-label="Status">
-                                            <span class="badge bg-<?= match ($row['status']) {
-                                                                        'Working' => 'success',
-                                                                        'Needs Repair' => 'warning',
-                                                                        'Replace', 'Decommissioned' => 'danger',
-                                                                        'Under Maintenance' => 'info',
+                                            <span class="badge bg-<?= match (strtolower(trim($row['status'] ?? ''))) {
+                                                                        'working' => 'success',
+                                                                        'needs repair', 'not applicable', 'n/a' => 'warning text-dark',
+                                                                        'replace', 'decommissioned' => 'danger',
+                                                                        'under maintenance' => 'info',
                                                                         default => 'danger'
                                                                     } ?>">
                                                 <?= htmlspecialchars($row['status'] ?? 'N/A') ?>
@@ -3893,16 +3893,13 @@ if ($categories_result && $categories_result->num_rows > 0) {
             if ($result && $result->num_rows > 0) {
                 $item_counter = ($page - 1) * $records_per_page + 1;
                 while ($row = $result->fetch_assoc()) {
-                    $status_class = 'success';
-                    if ($row['status'] == 'Needs Repair') {
-                        $status_class = 'warning';
-                    } elseif ($row['status'] == 'Under Maintenance') {
-                        $status_class = 'info';
-                    } elseif ($row['status'] == 'Decommissioned') {
-                        $status_class = 'danger';
-                    } elseif ($row['status'] == 'Replace') {
-                        $status_class = 'danger';
-                    }
+                    $status_class = match (strtolower(trim($row['status'] ?? ''))) {
+                        'working' => 'success',
+                        'needs repair', 'not applicable', 'n/a' => 'warning text-dark',
+                        'under maintenance' => 'info',
+                        'decommissioned', 'replace' => 'danger',
+                        default => 'danger'
+                    };
 
                     echo '<tr>';
                     echo '<td data-label="Campus">' . htmlspecialchars($row['campus'] ?? 'N/A') . '</td>';
