@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, rgba(7, 59, 29, 0.85) 0%, rgba(10, 77, 42, 0.85) 100%), url('dcccover.jpg');
+      background: linear-gradient(135deg, rgba(7, 59, 29, 0.85) 0%, rgba(10, 77, 42, 0.85) 100%), url('assets/images/dcccover.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -544,7 +544,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
-        <div class="brand-badge"><img src="DCC2.png" alt="DCC Logo"></div>
+        <div class="brand-badge"><img src="assets/images/DCC2.png" alt="DCC Logo"></div>
         <h1><span class="visually-hidden">DCC-DARTS</span>DCC-DARTS</h1>
         <p>Digital Asset Repository and Tracking System</p>
 
