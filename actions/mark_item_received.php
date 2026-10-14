@@ -98,12 +98,12 @@ if (empty($item['location'])) {
     }
 }
 
-// ── Phase 1 of receiving: RECORD how many units arrived on this line ──────────
-// Nothing is moved into inventory here. That only happens when the receiver
-// clicks the modal's "Complete Process & Move Items to Inventory" button (phase 2,
-// complete_po_receiving.php). There is deliberately NO is_received guard on the
-// UPDATE: a recorded (partial) line must stay editable so a short delivery can be
-// topped up tomorrow with the units that arrive then.
+// ── Record how many units arrived on this line, then post to inventory ─────────
+// The UPDATE stays guard-free so a partial line can be topped up tomorrow. When
+// the line is FULLY received (received qty >= ordered qty) the received quantity
+// is also pushed into inventory via po_post_item_to_inventory(), which is
+// idempotent per PO line — so re-submitting an already-posted line is a no-op and
+// can never double-count stock.
 $stmt = $conn->prepare(
     "UPDATE purchase_order_items
         SET is_received = 1, received_quantity = ?, received_date = ?, received_by = ?
@@ -163,12 +163,91 @@ if ($stmt->execute()) {
 
     $is_short = ($received_qty < (int)round((float)$item['quantity']));
     $status_label = $is_short ? 'Pending (partial delivery)' : 'Fully Received';
+
+    // ── Post the received quantity into inventory as soon as the line is FULLY
+    // received ────────────────────────────────────────────────────────────────
+    // A partial/pending line is NOT posted (it waits until topped up to full).
+    // po_post_item_to_inventory() is idempotent per PO line, so re-submitting an
+    // already-posted line simply returns 'skipped' — stock is never double-counted.
+    $stock = null;
+    if (!$is_short) {
+        $po_row_stmt = $conn->prepare("SELECT po_id, po_number, supplier_name FROM purchase_orders WHERE po_id = ?");
+        $po_row = ['po_id' => $item['po_id'], 'po_number' => '', 'supplier_name' => ''];
+        if ($po_row_stmt) {
+            $po_row_stmt->bind_param("i", $item['po_id']);
+            $po_row_stmt->execute();
+            $por = $po_row_stmt->get_result();
+            if ($por && $por->num_rows > 0) {
+                $po_row = $por->fetch_assoc();
+            }
+            $po_row_stmt->close();
+        }
+        // po_post_item_to_inventory() reads $item['quantity'] as the amount to post,
+        // so write the ACTUAL received count there (partial / short deliveries).
+        $item['quantity'] = $received_qty;
+        $stock = po_post_item_to_inventory($conn, $po_row, $item, $target, $user_id, $received_date);
+    }
+
+    // ── Finalise the PO automatically once EVERY line is fully received ─────────
+    // With the manual "Complete Process" button gone, the PO status must advance to
+    // 'Received' on its own the moment the last line reaches its ordered quantity,
+    // otherwise a fully-received PO would stay 'Draft' forever.
+    $po_finalized = false;
+    $totals_stmt = $conn->prepare(
+        "SELECT COUNT(*) AS total_lines,
+                SUM(CASE WHEN COALESCE(received_quantity, 0) >= quantity THEN 1 ELSE 0 END) AS full_lines
+         FROM purchase_order_items
+         WHERE po_id = ?"
+    );
+    if ($totals_stmt) {
+        $totals_stmt->bind_param("i", $item['po_id']);
+        $totals_stmt->execute();
+        $totals = $totals_stmt->get_result()->fetch_assoc();
+        $totals_stmt->close();
+
+        $total_lines = (int)($totals['total_lines'] ?? 0);
+        $full_lines  = (int)($totals['full_lines'] ?? 0);
+
+        if ($total_lines > 0 && $full_lines >= $total_lines) {
+            $po_finalized = true;
+            $upd_po = $conn->prepare(
+                "UPDATE purchase_orders
+                    SET status = 'Received',
+                        received_by = COALESCE(NULLIF(received_by, ''), ?),
+                        received_date = COALESCE(NULLIF(received_date, ''), ?)
+                  WHERE po_id = ? AND status <> 'Received'"
+            );
+            if ($upd_po) {
+                $upd_po->bind_param("ssi", $uid_str, $received_date, $item['po_id']);
+                $upd_po->execute();
+                $upd_po->close();
+            }
+        }
+    }
+
+    $message = "Recorded {$received_qty} unit(s) received for this item ({$status_label}).";
+    if (is_array($stock)) {
+        $st = $stock['status'] ?? '';
+        if ($st === 'incremented') {
+            $message .= ' Added to existing inventory item.';
+        } elseif ($st === 'created') {
+            $message .= ' Created a new inventory item.';
+        } elseif ($st === 'skipped') {
+            $message .= ' Already in inventory (no change).';
+        } elseif ($st === 'error') {
+            $message .= ' WARNING: inventory update failed — ' . ($stock['message'] ?? 'unknown error') . '.';
+        }
+    }
+    if ($po_finalized) {
+        $message .= ' All line items are now fully received — this purchase order has been marked as Received.';
+    }
+
     echo json_encode([
         'success' => true,
-        'message' => "Recorded {$received_qty} unit(s) received for this item ({$status_label}). "
-            . "Items are moved to inventory only after you click "
-            . "\"Complete Process & Move Items to Inventory\".",
+        'message' => $message,
         'received_quantity' => $received_qty,
+        'po_finalized' => $po_finalized,
+        'stock' => $stock,
         'item_qr_url' => $item_qr_url,
     ]);
 } else {

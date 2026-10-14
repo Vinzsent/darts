@@ -955,9 +955,6 @@ $verifier_name = 'Marilou L. Suarez';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" id="markPoReceivedBtn" onclick="markPOAsReceivedFromModal()">
-                    <i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory
-                </button>
                 <button type="button" class="btn btn-primary" onclick="printPurchaseOrderDetails()">
                     <i class="fas fa-print"></i> Print
                 </button>
@@ -1083,11 +1080,9 @@ $verifier_name = 'Marilou L. Suarez';
             const recvQtyRaw = (item.received_quantity === null || item.received_quantity === undefined || item.received_quantity === '') ?
                 null : item.received_quantity;
             // Two-phase workflow: a line is "recorded" once a count is submitted
-            // (is_received=1) but stays EDITABLE until the whole PO is finalised
-            // (po.status === 'Received'). Only a finalised PO locks the rows, so a
-            // short/partial delivery can be topped up tomorrow with the units that
-            // arrive then. Inventory is moved only by the footer "Complete Process"
-            // button — never by these per-line submits.
+            // (is_received=1) but stays EDITABLE until it is Fully Received (the
+            // recorded count >= the ordered qty). Once fully received — or once the
+            // whole PO is finalised (po.status === 'Received') — the row locks.
             const poFinalized = (po.status === 'Received');
             const savedQty = (recvQtyRaw === null) ? parseFloat(orderedQty) : parseFloat(recvQtyRaw);
             const isFull = savedQty >= parseFloat(orderedQty);
@@ -1124,10 +1119,16 @@ $verifier_name = 'Marilou L. Suarez';
             }
 
             // Action column: an editable line keeps its Submit button (records the
-            // count, stays updatable). A finalised PO locks everything.
+            // count, stays updatable). Once the line is Fully Received (recorded
+            // count >= ordered qty) the button is disabled so it can't be clicked
+            // again. A finalised PO locks everything.
             let actionCell;
             if (poFinalized) {
                 actionCell = '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>';
+            } else if (isRecv && isFull) {
+                actionCell = '<button class="btn btn-success btn-sm" disabled style="opacity:.65;cursor:not-allowed;" ' +
+                    'title="This line is fully received and can no longer be edited.">' +
+                    '<i class="fas fa-check-circle"></i> Received</button>';
             } else {
                 const btnLabel = isRecv ? 'Update' : 'Submit';
                 actionCell = `<button class="btn btn-success btn-sm" onclick="markItemReceived(${item.poi_id}, this)">` +
@@ -1232,54 +1233,6 @@ $verifier_name = 'Marilou L. Suarez';
         // The freshly built markup always starts on the first option, so put the
         // user's saved choice back before they read or submit anything.
         restoreStockTargetSelect();
-
-        // Footer button ("Complete Process & Move Items to Inventory"). Under the
-        // two-phase workflow, recording per-line counts does NOT lock this button —
-        // it stays available until the whole PO is finalised (po.status === 'Received').
-        // Clicking it posts every recorded received quantity into inventory.
-        const receivedBtn = document.getElementById('markPoReceivedBtn');
-        if (receivedBtn) {
-            const allItems = (items || []).length;
-            // How many lines still have no recorded count at all.
-            const unrecordedCount = (items || [])
-                .filter(item => parseInt(item.is_received, 10) !== 1).length;
-            const finalized = (po.status === 'Received');
-
-            // The target selector only matters when there is still stock to post.
-            const targetWrap = document.getElementById('stockTargetWrap');
-            if (targetWrap) {
-                targetWrap.style.display = finalized ? 'none' : 'block';
-            }
-
-            if (finalized) {
-                // The PO is already completed — lock against duplicate submissions.
-                receivedBtn.dataset.mode = 'done';
-                receivedBtn.disabled = true;
-                receivedBtn.classList.add('disabled');
-                receivedBtn.innerHTML = '<i class="fas fa-check"></i> Received';
-                receivedBtn.title = 'This purchase order has been completed and its ' +
-                    'items moved to inventory. It cannot be submitted again.';
-            } else if (allItems > 0) {
-                receivedBtn.dataset.mode = 'complete';
-                receivedBtn.disabled = false;
-                receivedBtn.classList.remove('disabled');
-                receivedBtn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
-                receivedBtn.title = unrecordedCount > 0
-                    ? unrecordedCount + ' line item(s) have no recorded quantity yet — ' +
-                      'those will be received at their ordered quantity. Clicking moves ' +
-                      'the recorded quantities into inventory and marks the PO as Received.'
-                    : 'Clicking moves the recorded received quantities into inventory ' +
-                      'and marks the purchase order as Received.';
-            } else {
-                // No items on this PO at all — allow the status/notes save.
-                receivedBtn.dataset.mode = 'complete';
-                receivedBtn.disabled = false;
-                receivedBtn.classList.remove('disabled');
-                receivedBtn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
-                receivedBtn.title = 'No line items on this purchase order — ' +
-                    'clicking saves the receiving notes and marks it as Received.';
-            }
-        }
     }
 
     // Edit purchase order
@@ -1287,99 +1240,9 @@ $verifier_name = 'Marilou L. Suarez';
         window.location.href = `purchase_order.php?edit=${poId}`;
     }
 
-    // Phase 2 — "Complete Process & Move Items to Inventory". This is the ONLY
-    // action that moves the recorded received quantities into inventory and marks
-    // the PO as Received. Per-line Submit only records counts, so this button stays
-    // enabled until the PO is finalised; a finalised PO (mode 'done') can never be
-    // submitted twice.
-    function markPOAsReceivedFromModal() {
-        if (!currentViewedPoId) return;
-
-        const btn = document.getElementById('markPoReceivedBtn');
-        const mode = (btn && btn.dataset.mode) || 'complete';
-
-        if (mode === 'done' || (btn && btn.disabled)) {
-            alert('This purchase order has already been completed.\n' +
-                'Its items have been moved to inventory.');
-            return;
-        }
-
-        const notesEl = document.getElementById('receivedNotesInput');
-        const notes = notesEl ? notesEl.value.trim() : '';
-        const targetEl = document.getElementById('stockTargetSelect');
-        const target = targetEl ? targetEl.value : 'supply';
-
-        const message = 'Move the recorded received quantities into inventory ' +
-            'and mark this purchase order as Received?\n\n' +
-            'Lines with no recorded quantity yet will be received at their ordered quantity.';
-
-        if (!confirm(message)) return;
-
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-        }
-
-        fetch('../actions/complete_po_receiving.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    po_id: currentViewedPoId,
-                    notes: notes,
-                    target: target
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    $('#viewPurchaseOrderModal').modal('hide');
-                    location.reload();
-                } else {
-                    alert('Error: ' + data.message);
-                    // A duplicate rejection means the PO is complete, so keep the
-                    // button locked; anything else leaves the button usable.
-                    if (data.already_received) {
-                        if (btn) {
-                            btn.dataset.mode = 'done';
-                            btn.disabled = true;
-                            btn.classList.add('disabled');
-                            btn.innerHTML = '<i class="fas fa-check"></i> Received';
-                        }
-                    } else {
-                        restoreReceivedBtn(btn);
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred. Please try again.');
-                restoreReceivedBtn(btn);
-            });
-    }
-
-    // Put the footer button back into its last known state after a failed save,
-    // otherwise the "Processing..." spinner + disabled flag would stick around.
-    // A button that was locked because the PO is complete stays locked.
-    function restoreReceivedBtn(btn) {
-        if (!btn) return;
-        if (btn.dataset.mode === 'done') {
-            btn.disabled = true;
-            btn.classList.add('disabled');
-            btn.innerHTML = '<i class="fas fa-check"></i> Received';
-            return;
-        }
-        btn.disabled = false;
-        btn.classList.remove('disabled');
-        btn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
-    }
-
     // Phase 1 — record how many units arrived on ONE line (from the details modal).
-    // This does NOT move anything into inventory; it only stores the received count
-    // and stays editable so a short delivery can be topped up tomorrow. Inventory is
-    // moved later, once, by the footer "Complete Process" button.
+    // This does NOT move anything into inventory; it only stores the received count.
+    // The action button locks once the line is Fully Received.
     function markItemReceived(poiId, btn) {
         // How many units physically arrived? The row carries a quantity input
         // that defaults to the ordered qty; fall back to it when missing.
@@ -1393,9 +1256,7 @@ $verifier_name = 'Marilou L. Suarez';
         }
 
         const qtyMsg = (receivedQty === null) ? '' : ` (${receivedQty} unit(s))`;
-        if (!confirm('Record' + qtyMsg + ' received for this item?\n\n' +
-            'This only saves the count — items move to inventory after you click ' +
-            '"Complete Process & Move Items to Inventory".')) return;
+        if (!confirm('Record' + qtyMsg + ' received for this item?')) return;
 
         const targetEl = document.getElementById('stockTargetSelect');
         const target = targetEl ? targetEl.value : 'supply';
