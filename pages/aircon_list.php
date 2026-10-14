@@ -1694,25 +1694,50 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         </tbody>
                     </table>
                 </div>
-
-                <?php if ($total_pages > 1): ?>
-                    <nav>
-                        <ul class="pagination justify-content-center mt-3" id="paginationContainer">
-                            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                <a class="page-link" href="#" onclick="loadInventory(<?= $page - 1 ?>); return false;">&laquo;</a>
-                            </li>
-                            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                                    <a class="page-link" href="#" onclick="loadInventory(<?= $i ?>); return false;"><?= $i ?></a>
-                                </li>
-                            <?php endfor; ?>
-                            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
-                                <a class="page-link" href="#" onclick="loadInventory(<?= $page + 1 ?>); return false;">&raquo;</a>
-                            </li>
-                        </ul>
-                    </nav>
-                <?php endif; ?>
             </div>
+
+            <?php if ($total_pages > 1): ?>
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center mt-3" id="paginationContainer">
+                        <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="#" onclick="loadInventory(<?= max(1, $page - 1) ?>); return false;">&laquo;</a>
+                        </li>
+                        <?php
+                        $neighborRange = 2;
+                        $start = max(1, (int)$page - $neighborRange);
+                        $end = min((int)$total_pages, (int)$page + $neighborRange);
+                        ?>
+                        <li class="page-item <?= (1 === (int)$page) ? 'active' : '' ?>">
+                            <a class="page-link" href="#" onclick="loadInventory(1); return false;">1</a>
+                        </li>
+
+                        <?php if ($start > 2): ?>
+                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                        <?php endif; ?>
+
+                        <?php for ($i = $start; $i <= $end; $i++): ?>
+                            <?php if ($i === 1 || $i === (int)$total_pages) continue; ?>
+                            <li class="page-item <?= ($i === (int)$page) ? 'active' : '' ?>">
+                                <a class="page-link" href="#" onclick="loadInventory(<?= $i ?>); return false;"><?= $i ?></a>
+                            </li>
+                        <?php endfor; ?>
+
+                        <?php if ($end < ((int)$total_pages - 1)): ?>
+                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                        <?php endif; ?>
+
+                        <?php if ($total_pages > 1): ?>
+                            <li class="page-item <?= (((int)$total_pages === (int)$page) ? 'active' : '') ?>">
+                                <a class="page-link" href="#" onclick="loadInventory(<?= (int)$total_pages ?>); return false;"><?= (int)$total_pages ?></a>
+                            </li>
+                        <?php endif; ?>
+
+                        <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                            <a class="page-link" href="#" onclick="loadInventory(<?= min((int)$total_pages, $page + 1) ?>); return false;">&raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
+            <?php endif; ?>
 
             <!-- Approve/Received Modal -->
             <div class="modal fade" id="receivedModal" tabindex="-1">
@@ -3572,9 +3597,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             }
 
                             // Update active state
-                            document.querySelectorAll('.page-item').forEach(item => {
+                            document.querySelectorAll('#paginationContainer .page-item').forEach(item => {
                                 item.classList.remove('active');
-                                if (item.querySelector('a')?.textContent == page) {
+                                if (item.querySelector('a')?.textContent.trim() == page) {
                                     item.classList.add('active');
                                 }
                             });
@@ -3970,16 +3995,47 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
             // Output pagination
             if ($total_pages > 1) {
+                $neighborRange = 2;
+                $start = max(1, (int)$page - $neighborRange);
+                $end = min((int)$total_pages, (int)$page + $neighborRange);
+
                 echo '<nav><ul class="pagination justify-content-center mt-3" id="paginationContainer">';
                 echo '<li class="page-item ' . (($page <= 1) ? 'disabled' : '') . '">';
-                echo '<a class="page-link" href="#" onclick="loadInventory(' . ($page - 1) . '); return false;">&laquo;</a></li>';
-                for ($i = 1; $i <= $total_pages; $i++) {
-                    echo '<li class="page-item ' . (($i == $page) ? 'active' : '') . '">';
+                echo '<a class="page-link" href="#" onclick="loadInventory(' . max(1, $page - 1) . '); return false;">&laquo;</a></li>';
+
+                // First page
+                echo '<li class="page-item ' . ((1 === (int)$page) ? 'active' : '') . '">';
+                echo '<a class="page-link" href="#" onclick="loadInventory(1); return false;">1</a></li>';
+
+                // Leading ellipsis
+                if ($start > 2) {
+                    echo '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+                }
+
+                // Middle pages
+                for ($i = $start; $i <= $end; $i++) {
+                    if ($i === 1 || $i === (int)$total_pages) continue;
+                    echo '<li class="page-item ' . (($i === (int)$page) ? 'active' : '') . '">';
                     echo '<a class="page-link" href="#" onclick="loadInventory(' . $i . '); return false;">' . $i . '</a></li>';
                 }
+
+                // Trailing ellipsis
+                if ($end < ((int)$total_pages - 1)) {
+                    echo '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+                }
+
+                // Last page
+                if ($total_pages > 1) {
+                    echo '<li class="page-item ' . (((int)$total_pages === (int)$page) ? 'active' : '') . '">';
+                    echo '<a class="page-link" href="#" onclick="loadInventory(' . (int)$total_pages . '); return false;">' . (int)$total_pages . '</a></li>';
+                }
+
+                // Next
                 echo '<li class="page-item ' . (($page >= $total_pages) ? 'disabled' : '') . '">';
-                echo '<a class="page-link" href="#" onclick="loadInventory(' . ($page + 1) . '); return false;">&raquo;</a></li>';
+                echo '<a class="page-link" href="#" onclick="loadInventory(' . min((int)$total_pages, $page + 1) . '); return false;">&raquo;</a></li>';
                 echo '</ul></nav>';
+            } else {
+                echo '<ul class="pagination justify-content-center mt-3 d-none" id="paginationContainer"></ul>';
             }
             exit;
         }
