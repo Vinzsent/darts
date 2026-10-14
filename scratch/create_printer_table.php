@@ -23,12 +23,12 @@ if ($conn->query($sql) === TRUE) {
     $row = $result->fetch_assoc();
     if ($row['cnt'] == 0) {
         $logo = 'assets/images/logo.png';
-        if (file_exists('DCC2.png') && !file_exists('uploads/DCC2.png')) {
+        if (file_exists('../assets/images/DCC2.png') && !file_exists('uploads/DCC2.png')) {
             // copy to uploads/ or just keep it there
             if (!is_dir('uploads')) {
                 mkdir('uploads', 0777, true);
             }
-            copy('DCC2.png', 'uploads/DCC2.png');
+            copy('../assets/images/DCC2.png', 'uploads/DCC2.png');
             $logo = 'uploads/DCC2.png';
         }
         

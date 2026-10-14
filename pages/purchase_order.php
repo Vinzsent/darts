@@ -19,8 +19,8 @@ $print_header = $header_query ? $header_query->fetch_assoc() : null;
 $school_logo = '../assets/images/logo.png';
 if ($print_header && !empty($print_header['logo_path']) && file_exists('../' . $print_header['logo_path'])) {
     $school_logo = '../' . $print_header['logo_path'];
-} elseif (file_exists('../DCC2.png')) {
-    $school_logo = '../DCC2.png';
+} elseif (file_exists('../assets/images/DCC2.png')) {
+    $school_logo = '../assets/images/DCC2.png';
 }
 
 $school_name = !empty($print_header['school_name']) ? $print_header['school_name'] : 'DAVAO CENTRAL COLLEGE';

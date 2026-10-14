@@ -159,7 +159,7 @@ if ($mark_all_items) {
     // Flag only posted lines. Bulk-flag-then-post stranded failures as Received.
     if ($posted_ok_ids) {
         $ids_csv = implode(',', array_map('intval', $posted_ok_ids));
-        $conn->query("UPDATE purchase_order_items SET is_received = 1, received_date = '" . $conn->real_escape_string($received_date) . "', received_by = COALESCE(NULLIF(received_by, ''), '" . $conn->real_escape_string((string)$received_by) . "') WHERE poi_id IN ($ids_csv)");
+        $conn->query("UPDATE purchase_order_items SET is_received = 1, received_quantity = quantity, received_date = '" . $conn->real_escape_string($received_date) . "', received_by = COALESCE(NULLIF(received_by, ''), '" . $conn->real_escape_string((string)$received_by) . "') WHERE poi_id IN ($ids_csv)");
     }
     if ($post_errors && count($posted_ok_ids) === 0) {
         echo json_encode(['success' => false, 'message' => 'No stock posted: ' . implode('; ', $post_errors)]);

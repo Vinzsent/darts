@@ -86,7 +86,9 @@ $po_query = "
         MAX(COALESCE($receiver_name_expr, ru.username, NULLIF(p.received_by, ''), '')) as received_by_name,
         MAX(COALESCE(ru.user_type, '')) as received_by_role,
         COUNT(poi.poi_id) as item_count,
-        SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) as received_item_count
+        SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) as received_item_count,
+        SUM(COALESCE(poi.quantity, 0)) as ordered_qty_total,
+        SUM(CASE WHEN poi.is_received = 1 THEN COALESCE(poi.received_quantity, 0) ELSE 0 END) as received_qty_total
     FROM purchase_orders p
     LEFT JOIN `user` u ON p.created_by = u.id
     LEFT JOIN `user` ru ON CAST(p.received_by AS UNSIGNED) = ru.id
@@ -152,7 +154,7 @@ $items_map = [];
 $page_po_ids = array_map('intval', array_column($po_rows, 'po_id'));
 if ($page_po_ids) {
     $ids_csv = implode(',', $page_po_ids);
-    $items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, unit_cost, line_total, is_received, received_date FROM purchase_order_items WHERE po_id IN ($ids_csv) ORDER BY po_id, item_number ASC");
+    $items_result = $conn->query("SELECT po_id, item_number, item_description, quantity, received_quantity, unit_cost, line_total, is_received, received_date FROM purchase_order_items WHERE po_id IN ($ids_csv) ORDER BY po_id, item_number ASC");
     if ($items_result) {
         while ($it = $items_result->fetch_assoc()) {
             $items_map[$it['po_id']][] = $it;
@@ -167,14 +169,28 @@ $print_header = $header_query ? $header_query->fetch_assoc() : null;
 $school_logo = '../assets/images/logo.png';
 if ($print_header && !empty($print_header['logo_path']) && file_exists('../' . $print_header['logo_path'])) {
     $school_logo = '../' . $print_header['logo_path'];
-} elseif (file_exists('../DCC2.png')) {
-    $school_logo = '../DCC2.png';
+} elseif (file_exists('../assets/images/DCC2.png')) {
+    $school_logo = '../assets/images/DCC2.png';
 }
 
 $school_name = !empty($print_header['school_name']) ? $print_header['school_name'] : 'DAVAO CENTRAL COLLEGE';
 $school_address = !empty($print_header['address']) ? $print_header['address'] : 'Juan dela Cruz St., Toril, Davao City, Philippines';
 $school_email = !empty($print_header['email_address']) ? $print_header['email_address'] : 'davaocentralcollege2011@gmail.com';
 $school_website = !empty($print_header['website']) ? $print_header['website'] : 'www.dcc.edu.ph';
+
+/**
+ * Format a decimal quantity for display without trailing zeros
+ * ("5.00" -> "5", "5.50" -> "5.5"). Quantities are stored as decimal(10,2),
+ * but showing "5.00" for a whole count is noise.
+ */
+function po_fmt_qty($v)
+{
+    $s = (string)$v;
+    if (strpos($s, '.') !== false) {
+        $s = rtrim(rtrim($s, '0'), '.');
+    }
+    return $s === '' ? '0' : $s;
+}
 
 /**
  * Compose a full name from an employee row (First M. Last).
@@ -658,15 +674,15 @@ $verifier_name = 'Marilou L. Suarez';
             <div class="action-buttons">
                 <form method="GET" action="purchase_order_list.php" class="d-flex align-items-center" style="gap:.5rem;">
                     <input type="text" name="search" id="poSearchInput" class="form-control form-control-sm"
-                           placeholder="Search item, PO no., or supplier..."
-                           value="<?= htmlspecialchars($search_term) ?>"
-                           style="width: 320px;" aria-label="Search purchase orders">
+                        placeholder="Search item, PO no., or supplier..."
+                        value="<?= htmlspecialchars($search_term) ?>"
+                        style="width: 320px;" aria-label="Search purchase orders">
                     <button type="submit" class="btn btn-sm" style="background:#fff;color:var(--primary-green);">
                         <i class="fas fa-search"></i>
                     </button>
                     <?php if ($search_term !== ''): ?>
                         <a href="purchase_order_list.php" class="btn btn-sm" style="background:#fff;color:var(--primary-green);"
-                           title="Clear search">
+                            title="Clear search">
                             <i class="fas fa-times"></i>
                         </a>
                     <?php endif; ?>
@@ -734,6 +750,8 @@ $verifier_name = 'Marilou L. Suarez';
                                 <?php
                                 $row_total = (int)$po['item_count'];
                                 $row_recv  = (int)($po['received_item_count'] ?? 0);
+                                $ordered_qty_total  = (int)($po['ordered_qty_total'] ?? 0);
+                                $received_qty_total = (int)($po['received_qty_total'] ?? 0);
                                 if ($row_total > 0 && $row_recv >= $row_total) {
                                     $recv_label  = 'Fully Received';
                                     $recv_bg     = 'var(--accent-green-approved)';
@@ -747,7 +765,14 @@ $verifier_name = 'Marilou L. Suarez';
                                 ?>
                                 <span class="badge" style="background-color: <?= $recv_bg ?>; color: white;
                                                      font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold;">
-                                    <?= $row_recv ?> / <?= $row_total ?>
+                                    <?= $row_recv ?> / <?= $row_total ?> lines
+                                </span>
+                                <br>
+                                <span class="badge" style="background-color: #ffffff; color: #212529; border: 1px solid #ced4da;
+                                                     font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; margin-top: 3px; display: inline-block;"
+                                    title="Total units received vs. total units ordered across all lines">
+                                    <i class="fas fa-boxes" style="opacity:.7;"></i>
+                                    <?= $received_qty_total ?> / <?= $ordered_qty_total ?> units
                                 </span>
                                 <br>
                                 <small class="text-muted"><?= $recv_label ?></small>
@@ -799,7 +824,23 @@ $verifier_name = 'Marilou L. Suarez';
                                                 <tr>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef;"><?= (int)$ritem['item_number'] ?></td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef;"><?= htmlspecialchars($ritem['item_description']) ?></td>
-                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;"><?= htmlspecialchars($ritem['quantity']) ?></td>
+                                                    <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">
+                                                        <?php
+                                                        $line_ordered = htmlspecialchars(po_fmt_qty($ritem['quantity']));
+                                                        $line_is_recv = (int)($ritem['is_received'] ?? 0) === 1;
+                                                        if ($line_is_recv) {
+                                                            $line_recv = $ritem['received_quantity'] ?? null;
+                                                            $line_recv = ($line_recv === null || $line_recv === '')
+                                                                ? $ritem['quantity']
+                                                                : $line_recv;
+                                                            echo '<strong>' . $line_ordered . '</strong> ordered<br>'
+                                                                . '<span class="text-muted" style="font-size:.82rem;">'
+                                                                . htmlspecialchars(po_fmt_qty($line_recv)) . ' received</span>';
+                                                        } else {
+                                                            echo '<strong>' . $line_ordered . '</strong>';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['unit_cost'], 2) ?></td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: right;">₱<?= number_format($ritem['line_total'], 2) ?></td>
                                                     <td style="padding: 6px 10px; border-bottom: 1px solid #e9ecef; text-align: center;">
@@ -915,7 +956,7 @@ $verifier_name = 'Marilou L. Suarez';
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-success" id="markPoReceivedBtn" onclick="markPOAsReceivedFromModal()">
-                    <i class="fas fa-check-circle"></i> Received
+                    <i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory
                 </button>
                 <button type="button" class="btn btn-primary" onclick="printPurchaseOrderDetails()">
                     <i class="fas fa-print"></i> Print
@@ -968,7 +1009,7 @@ $verifier_name = 'Marilou L. Suarez';
         if (value !== 'property' && value !== 'supply') return;
         try {
             localStorage.setItem(STOCK_TARGET_KEY, value);
-        } catch (e) { }
+        } catch (e) {}
     }
 
     // Re-apply the saved choice every time the modal content is rebuilt.
@@ -1019,31 +1060,90 @@ $verifier_name = 'Marilou L. Suarez';
             // Per-line receiver: whoever clicked "Receive Items" on this row.
             // Older rows may store a raw value with no matching user, so fall
             // back to whatever text is stored rather than showing a blank cell.
-            const recvByName = (item.item_received_by_name && item.item_received_by_name !== 'Unknown')
-                ? String(item.item_received_by_name)
-                : (isRecv && item.item_received_by && String(item.item_received_by) !== '0' ? String(item.item_received_by) : '');
+            const recvByName = (item.item_received_by_name && item.item_received_by_name !== 'Unknown') ?
+                String(item.item_received_by_name) :
+                (isRecv && item.item_received_by && String(item.item_received_by) !== '0' ? String(item.item_received_by) : '');
             const recvByRole = (isRecv && item.item_received_by_role) ? String(item.item_received_by_role) : '';
-            const recvByCell = isRecv && recvByName
-                ? `<div style="line-height:1.2;"><strong style="font-size:0.82rem;">${recvByName}</strong>${recvByRole ? `<br><small class="text-muted" style="font-size:0.72rem;">${recvByRole}</small>` : ''}</div>`
-                : '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>';
+            const recvByCell = isRecv && recvByName ?
+                `<div style="line-height:1.2;"><strong style="font-size:0.82rem;">${recvByName}</strong>${recvByRole ? `<br><small class="text-muted" style="font-size:0.72rem;">${recvByRole}</small>` : ''}</div>` :
+                '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>';
+
+            // Quantity counter: ordered vs. actually received. Pending rows let
+            // the receiver type how many units physically arrived (defaults to the
+            // ordered qty); received rows show the tally that was saved.
+            // Trailing ".00" is stripped so quantities read as clean integers.
+            const fmtQty = (v) => {
+                if (v === null || v === undefined || v === '') return '0';
+                const n = parseFloat(v);
+                if (Number.isNaN(n)) return String(v);
+                // Drop trailing ".00" but keep genuine fractions (5.5 stays 5.5).
+                return String(parseFloat(n.toFixed(4)));
+            };
+            const orderedQty = (item.quantity === null || item.quantity === undefined) ? 0 : item.quantity;
+            const recvQtyRaw = (item.received_quantity === null || item.received_quantity === undefined || item.received_quantity === '') ?
+                null : item.received_quantity;
+            // Two-phase workflow: a line is "recorded" once a count is submitted
+            // (is_received=1) but stays EDITABLE until the whole PO is finalised
+            // (po.status === 'Received'). Only a finalised PO locks the rows, so a
+            // short/partial delivery can be topped up tomorrow with the units that
+            // arrive then. Inventory is moved only by the footer "Complete Process"
+            // button — never by these per-line submits.
+            const poFinalized = (po.status === 'Received');
+            const savedQty = (recvQtyRaw === null) ? parseFloat(orderedQty) : parseFloat(recvQtyRaw);
+            const isFull = savedQty >= parseFloat(orderedQty);
+
+            let qtyCell;
+            if (poFinalized) {
+                // Locked after the PO is completed — show the final tally.
+                const short = (savedQty < parseFloat(orderedQty));
+                qtyCell = `<div style="line-height:1.2;"><strong>${fmtQty(orderedQty)}</strong> ordered` +
+                    `<br><span class="text-muted" style="font-size:.82rem;">${fmtQty(savedQty)} received</span>` +
+                    (short ? `<br><span class="badge bg-warning text-dark" style="font-size:.7rem;margin-top:2px;">short</span>` : ``) +
+                    `</div>`;
+            } else {
+                // Editable: prefill the input with whatever was last recorded.
+                qtyCell = `<div style="line-height:1.2;"><strong>${fmtQty(orderedQty)}</strong> ordered` +
+                    `<br><input type="number" min="0" max="${fmtQty(orderedQty)}" step="1" value="${fmtQty(savedQty)}" ` +
+                    `class="form-control form-control-sm recv-qty-input" data-poi-id="${item.poi_id}" ` +
+                    `style="width:90px;display:inline-block;text-align:right;margin-top:2px;" ` +
+                    `title="How many units actually arrived? (max ${fmtQty(orderedQty)})">` +
+                    `<div style="font-size:.75rem;color:#6c757d;">received</div></div>`;
+            }
+
+            // Status column: Fully Received when the recorded count matches the
+            // ordered qty, otherwise Pending. A finalised PO is simply "Received".
+            let statusCell;
+            if (poFinalized) {
+                statusCell = '<span class="badge bg-success"><i class="fas fa-check"></i> Received</span>';
+            } else if (isRecv) {
+                statusCell = isFull
+                    ? '<span class="badge bg-success"><i class="fas fa-check"></i> Fully Received</span>'
+                    : '<span class="badge bg-warning text-dark"><i class="fas fa-clock"></i> Pending</span>';
+            } else {
+                statusCell = '<span class="badge bg-secondary"><i class="fas fa-hourglass-start"></i> Pending</span>';
+            }
+
+            // Action column: an editable line keeps its Submit button (records the
+            // count, stays updatable). A finalised PO locks everything.
+            let actionCell;
+            if (poFinalized) {
+                actionCell = '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>';
+            } else {
+                const btnLabel = isRecv ? 'Update' : 'Submit';
+                actionCell = `<button class="btn btn-success btn-sm" onclick="markItemReceived(${item.poi_id}, this)">` +
+                    `<i class="fas fa-check-circle"></i> ${btnLabel}</button>`;
+            }
+
             itemsHtml += `
                 <tr>
-                    <td>${item.item_number}</td>
                     <td>${item.item_description}</td>
-                    <td>${item.quantity}</td>
+                    <td>${qtyCell}</td>
                     <td>₱${parseFloat(item.unit_cost).toFixed(2)}</td>
                     <td>₱${parseFloat(item.line_total).toFixed(2)}</td>
                     <td>${recvDateStr ? `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e9ecef;color:#212529;font-size:0.82rem;border:1px solid #ced4da;">${recvDateStr}</span>` : '<span style="color:#6c757d;font-size:0.85rem;">Not received</span>'}</td>
                     <td>${recvByCell}</td>
-                    <td>
-                        ${isRecv ? `
-                            <span class="badge bg-success"><i class="fas fa-check"></i> Already Received</span>
-                        ` : `
-                            <button class="btn btn-success btn-sm" onclick="markItemReceived(${item.poi_id}, this)">
-                                <i class="fas fa-check-circle"></i> Receive Items
-                            </button>
-                        `}
-                    </td>
+                    <td>${statusCell}</td>
+                    <td>${actionCell}</td>
                 </tr>
             `;
             grandTotal += parseFloat(item.line_total);
@@ -1075,21 +1175,23 @@ $verifier_name = 'Marilou L. Suarez';
                 <table class="table table-bordered">
                     <thead style="background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%); color: white;">
                         <tr>
-                            <th>#</th>
                             <th>Item Description</th>
-                            <th>Quantity</th>
+                            <th style="min-width:120px;">Qty (Ordered / Received)</th>
                             <th>Unit Cost</th>
                             <th>Total</th>
                             <th>Received Date</th>
                             <th>Received By</th>
+                            <th>Status</th>
                             <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${itemsHtml}
                         <tr style="background-color: var(--primary-green); color: white; font-weight: bold;">
-                            <td colspan="5" style="text-align: right;">GRAND TOTAL:</td>
+                            <td colspan="4" style="text-align: right;">GRAND TOTAL:</td>
                             <td>₱${grandTotal.toFixed(2)}</td>
+                            <td></td>
+                            <td></td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -1131,44 +1233,51 @@ $verifier_name = 'Marilou L. Suarez';
         // user's saved choice back before they read or submit anything.
         restoreStockTargetSelect();
 
-        // Footer button state is driven by the item-level Action column.
-        // Once every line item is received there is nothing left to action, so the
-        // button locks out — this prevents the same PO being submitted twice.
+        // Footer button ("Complete Process & Move Items to Inventory"). Under the
+        // two-phase workflow, recording per-line counts does NOT lock this button —
+        // it stays available until the whole PO is finalised (po.status === 'Received').
+        // Clicking it posts every recorded received quantity into inventory.
         const receivedBtn = document.getElementById('markPoReceivedBtn');
         if (receivedBtn) {
             const allItems = (items || []).length;
-            const pendingCount = (items || [])
+            // How many lines still have no recorded count at all.
+            const unrecordedCount = (items || [])
                 .filter(item => parseInt(item.is_received, 10) !== 1).length;
+            const finalized = (po.status === 'Received');
 
-            // The target selector only matters when there is stock to post.
+            // The target selector only matters when there is still stock to post.
             const targetWrap = document.getElementById('stockTargetWrap');
             if (targetWrap) {
-                targetWrap.style.display = pendingCount > 0 ? 'block' : 'none';
+                targetWrap.style.display = finalized ? 'none' : 'block';
             }
 
-            if (allItems > 0 && pendingCount === 0) {
-                // Everything received — lock the button against duplicate submissions.
+            if (finalized) {
+                // The PO is already completed — lock against duplicate submissions.
                 receivedBtn.dataset.mode = 'done';
                 receivedBtn.disabled = true;
                 receivedBtn.classList.add('disabled');
                 receivedBtn.innerHTML = '<i class="fas fa-check"></i> Received';
-                receivedBtn.title = 'All line items are already received. ' +
-                    'This purchase order is complete and cannot be submitted again.';
-            } else if (pendingCount > 0) {
-                receivedBtn.dataset.mode = 'receive-all';
+                receivedBtn.title = 'This purchase order has been completed and its ' +
+                    'items moved to inventory. It cannot be submitted again.';
+            } else if (allItems > 0) {
+                receivedBtn.dataset.mode = 'complete';
                 receivedBtn.disabled = false;
                 receivedBtn.classList.remove('disabled');
-                receivedBtn.innerHTML = '<i class="fas fa-check-circle"></i> Received';
-                receivedBtn.title = pendingCount + ' line item(s) still outstanding — ' +
-                    'clicking marks them and the whole purchase order as received.';
+                receivedBtn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
+                receivedBtn.title = unrecordedCount > 0
+                    ? unrecordedCount + ' line item(s) have no recorded quantity yet — ' +
+                      'those will be received at their ordered quantity. Clicking moves ' +
+                      'the recorded quantities into inventory and marks the PO as Received.'
+                    : 'Clicking moves the recorded received quantities into inventory ' +
+                      'and marks the purchase order as Received.';
             } else {
                 // No items on this PO at all — allow the status/notes save.
-                receivedBtn.dataset.mode = 'submit';
+                receivedBtn.dataset.mode = 'complete';
                 receivedBtn.disabled = false;
                 receivedBtn.classList.remove('disabled');
-                receivedBtn.innerHTML = '<i class="fas fa-check"></i> Submit';
+                receivedBtn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
                 receivedBtn.title = 'No line items on this purchase order — ' +
-                    'clicking saves the receiving notes.';
+                    'clicking saves the receiving notes and marks it as Received.';
             }
         }
     }
@@ -1178,20 +1287,20 @@ $verifier_name = 'Marilou L. Suarez';
         window.location.href = `purchase_order.php?edit=${poId}`;
     }
 
-    // Finalise from the modal footer. The button is disabled by
-    // displayPurchaseOrderDetails() when every line item is already received, so
-    // that state can never be submitted twice; this guard is the safety net.
-    //   receive-all -> outstanding line items + the PO are marked received
-    //   submit      -> notes are persisted (PO has no line items)
+    // Phase 2 — "Complete Process & Move Items to Inventory". This is the ONLY
+    // action that moves the recorded received quantities into inventory and marks
+    // the PO as Received. Per-line Submit only records counts, so this button stays
+    // enabled until the PO is finalised; a finalised PO (mode 'done') can never be
+    // submitted twice.
     function markPOAsReceivedFromModal() {
         if (!currentViewedPoId) return;
 
         const btn = document.getElementById('markPoReceivedBtn');
-        const mode = (btn && btn.dataset.mode) || 'submit';
+        const mode = (btn && btn.dataset.mode) || 'complete';
 
         if (mode === 'done' || (btn && btn.disabled)) {
-            alert('All items on this purchase order are already received.\n' +
-                'This purchase order has already been completed.');
+            alert('This purchase order has already been completed.\n' +
+                'Its items have been moved to inventory.');
             return;
         }
 
@@ -1200,18 +1309,18 @@ $verifier_name = 'Marilou L. Suarez';
         const targetEl = document.getElementById('stockTargetSelect');
         const target = targetEl ? targetEl.value : 'supply';
 
-        const message = mode === 'receive-all' ?
-            'Mark all outstanding items and this purchase order as received?' :
-            'Submit the receiving report and save your notes?';
+        const message = 'Move the recorded received quantities into inventory ' +
+            'and mark this purchase order as Received?\n\n' +
+            'Lines with no recorded quantity yet will be received at their ordered quantity.';
 
         if (!confirm(message)) return;
 
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
         }
 
-        fetch('../actions/mark_as_received.php', {
+        fetch('../actions/complete_po_receiving.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1219,7 +1328,6 @@ $verifier_name = 'Marilou L. Suarez';
                 body: JSON.stringify({
                     po_id: currentViewedPoId,
                     notes: notes,
-                    mark_all_items: mode === 'receive-all',
                     target: target
                 })
             })
@@ -1253,8 +1361,8 @@ $verifier_name = 'Marilou L. Suarez';
     }
 
     // Put the footer button back into its last known state after a failed save,
-    // otherwise the "Saving..." spinner + disabled flag would stick around.
-    // A button that was locked because everything is already received stays locked.
+    // otherwise the "Processing..." spinner + disabled flag would stick around.
+    // A button that was locked because the PO is complete stays locked.
     function restoreReceivedBtn(btn) {
         if (!btn) return;
         if (btn.dataset.mode === 'done') {
@@ -1265,14 +1373,29 @@ $verifier_name = 'Marilou L. Suarez';
         }
         btn.disabled = false;
         btn.classList.remove('disabled');
-        btn.innerHTML = btn.dataset.mode === 'receive-all' ?
-            '<i class="fas fa-check-circle"></i> Received' :
-            '<i class="fas fa-check"></i> Submit';
+        btn.innerHTML = '<i class="fas fa-dolly"></i> Complete Process &amp; Move Items to Inventory';
     }
 
-    // Mark a single purchase order item as Received (from the details modal)
+    // Phase 1 — record how many units arrived on ONE line (from the details modal).
+    // This does NOT move anything into inventory; it only stores the received count
+    // and stays editable so a short delivery can be topped up tomorrow. Inventory is
+    // moved later, once, by the footer "Complete Process" button.
     function markItemReceived(poiId, btn) {
-        if (!confirm('Mark this item as received and add it to inventory?')) return;
+        // How many units physically arrived? The row carries a quantity input
+        // that defaults to the ordered qty; fall back to it when missing.
+        let receivedQty = null;
+        const qtyInput = document.querySelector('.recv-qty-input[data-poi-id="' + poiId + '"]');
+        if (qtyInput) {
+            const parsed = parseFloat(qtyInput.value);
+            if (!Number.isNaN(parsed) && parsed >= 0) {
+                receivedQty = parsed;
+            }
+        }
+
+        const qtyMsg = (receivedQty === null) ? '' : ` (${receivedQty} unit(s))`;
+        if (!confirm('Record' + qtyMsg + ' received for this item?\n\n' +
+            'This only saves the count — items move to inventory after you click ' +
+            '"Complete Process & Move Items to Inventory".')) return;
 
         const targetEl = document.getElementById('stockTargetSelect');
         const target = targetEl ? targetEl.value : 'supply';
@@ -1289,14 +1412,16 @@ $verifier_name = 'Marilou L. Suarez';
                 },
                 body: JSON.stringify({
                     poi_id: poiId,
-                    target: target
+                    target: target,
+                    received_quantity: receivedQty
                 })
             })
             .then(async response => {
                 const text = await response.text();
                 let data = null;
-                try { data = text ? JSON.parse(text) : null; }
-                catch (e) {
+                try {
+                    data = text ? JSON.parse(text) : null;
+                } catch (e) {
                     console.error('Non-JSON reply from mark_item_received.php:', text.slice(0, 2000));
                     throw new Error('Server returned non-JSON (' + response.status + '): ' + text.slice(0, 300));
                 }
@@ -1312,7 +1437,7 @@ $verifier_name = 'Marilou L. Suarez';
                     alert('Error: ' + data.message);
                     if (btn) {
                         btn.disabled = false;
-                        btn.innerHTML = '<i class="fas fa-check-circle"></i> Receive Items';
+                        btn.innerHTML = '<i class="fas fa-check-circle"></i> Submit';
                     }
                 }
             })
@@ -1321,7 +1446,7 @@ $verifier_name = 'Marilou L. Suarez';
                 alert('Receive failed: ' + (error && error.message ? error.message : error) + '\nCheck DevTools > Network > mark_item_received.php > Response for the PHP error.');
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Receive Items';
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Submit';
                 }
             });
     }

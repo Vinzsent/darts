@@ -85,6 +85,11 @@ try {
     // not have the column yet, so fall back to the PO-level receiver.
     $has_item_recv_by = in_array('received_by', $poi_cols, true);
     $item_recv_by_col = $has_item_recv_by ? 'poi.received_by AS item_received_by' : 'p.received_by AS item_received_by';
+    // Per-line received counter (how many units actually arrived). Older
+    // databases may not have the column yet, so fall back to NULL.
+    $item_recv_qty_col = in_array('received_quantity', $poi_cols, true)
+        ? 'poi.received_quantity AS received_quantity'
+        : 'NULL AS received_quantity';
     if (in_array('first_name', $user_cols, true) && in_array('last_name', $user_cols, true)) {
         $item_receiver_expr = $has_item_recv_by
             ? "NULLIF(TRIM(CONCAT_WS(' ', iu.first_name, iu.last_name)), '')"
@@ -111,6 +116,7 @@ try {
             poi.line_total,
             poi.is_received,
             $poi_recv_col,
+            $item_recv_qty_col,
             $item_recv_by_col,
             COALESCE($item_receiver_expr, " . ($has_item_recv_by ? "iu.username" : "ru.username") . ", NULLIF(" . ($has_item_recv_by ? "poi.received_by" : "p.received_by") . ", ''), 'Unknown') AS item_received_by_name,
             " . ($has_item_recv_by ? "iu.user_type" : "ru.user_type") . " AS item_received_by_role
