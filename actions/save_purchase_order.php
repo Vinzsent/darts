@@ -1,14 +1,22 @@
 <?php
-// Clean output buffer to prevent any HTML/whitespace before JSON
-ob_clean();
-session_start();
+ob_start();
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level() > 0) { @ob_end_clean(); }
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+        }
+        echo json_encode(['success' => false, 'message' => 'PHP fatal error: ' . $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line']]);
+    }
+});
 
-// Set JSON header immediately
-header('Content-Type: application/json');
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Disable error display to prevent HTML in JSON response
-error_reporting(0);
-ini_set('display_errors', 0);
+header('Content-Type: application/json; charset=utf-8');
 
 include '../includes/auth.php';
 include '../includes/db.php';
@@ -19,10 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$user_id = $_SESSION['user']['id'] ?? 0;
+$user_id = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 0;
 
 if (!$user_id) {
-    echo json_encode(['success' => false, 'message' => 'User not authenticated']);
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'User not authenticated. Please log in again.']);
     exit;
 }
 
@@ -117,6 +126,15 @@ function savePurchaseOrder($data, $conn, $user_id) {
         
         // Insert items
         $total_amount = 0;
+        // Check if quantity column is string (varchar/text) or numeric (decimal)
+        $is_qty_str = true;
+        $q_res = $conn->query("SHOW COLUMNS FROM purchase_order_items LIKE 'quantity'");
+        if ($q_res && $q_col = $q_res->fetch_assoc()) {
+            $col_type = strtolower($q_col['Type'] ?? '');
+            $is_qty_str = (strpos($col_type, 'char') !== false || strpos($col_type, 'text') !== false);
+            $q_res->free();
+        }
+
         // The location column is optional so this still works on older databases.
         $has_location = po_location_column_exists($conn);
         if (isset($data['items']) && is_array($data['items'])) {
@@ -135,14 +153,15 @@ function savePurchaseOrder($data, $conn, $user_id) {
                     // An empty value stays NULL, which falls back to the receiver's role.
                     $location = po_normalize_location($item['location'] ?? '');
                     $location_sql = $location === null ? 'NULL' : "'$location'";
+                    $qty_sql = $is_qty_str ? "'$quantity_escaped'" : $num_quantity;
 
                     $item_sql = $has_location
                         ? "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
-                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total, $location_sql)"
+                            VALUES ($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total, $location_sql)"
                         : "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total)";
+                            VALUES ($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total)";
                     
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
@@ -177,11 +196,12 @@ try {
     $result = savePurchaseOrder($input, $conn, $user_id);
     
     // Ensure clean JSON output
-    ob_clean();
+    while (ob_get_level() > 0) { @ob_end_clean(); }
     echo json_encode($result);
     exit;
 } catch (Exception $e) {
-    ob_clean();
+    while (ob_get_level() > 0) { @ob_end_clean(); }
+    http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
     exit;
 }

@@ -1,7 +1,4 @@
 <?php
-// Show all errors on this page for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
 $pageTitle = 'Purchase Order';
 include '../includes/auth.php';
@@ -947,8 +944,9 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                 // Calculate row total when quantity or unit cost changes
                 function calculateRowTotal(input) {
                     const row = input.closest('tr');
-                    const quantity = parseFloat(row.cells[2].querySelector('input').value) || 0;
-                    const unitCost = parseFloat(row.cells[3].querySelector('input').value) || 0;
+                    const rawQty = row.cells[2].querySelector('input')?.value || '0';
+                    const quantity = parseFloat(rawQty) || 0;
+                    const unitCost = parseFloat(row.cells[3].querySelector('input')?.value) || 0;
                     const amount = quantity * unitCost;
 
                     row.cells[4].textContent = '₱' + amount.toFixed(2);
@@ -962,7 +960,7 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     let total = 0;
 
                     rows.forEach(row => {
-                        const amountText = row.cells[4].textContent.replace('₱', '').replace(',', '');
+                        const amountText = row.cells[4]?.textContent.replace('₱', '').replace(',', '') || '0';
                         const amount = parseFloat(amountText) || 0;
                         total += amount;
                     });
@@ -1039,7 +1037,7 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                         const desc = descInput ? descInput.value.trim() : '';
                         const qty = row.cells[2].querySelector('input')?.value.trim() || '';
                         const cost = row.cells[3].querySelector('input')?.value.trim() || '';
-                        const amt = row.cells[4].textContent.replace('₱', '').trim();
+                        const amt = row.cells[4]?.textContent.replace('₱', '').trim() || '';
 
                         if (desc || qty || cost || (amt && amt !== '0.00')) {
                             items.push({
@@ -1148,6 +1146,7 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                             items.push({
                                 description: description,
                                 quantity: rawQuantity,
+                                location: '',
                                 unit_cost: unit_cost
                             });
                         }
@@ -1184,18 +1183,34 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     fetch('../actions/save_purchase_order.php', {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json'
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
                             },
                             body: JSON.stringify(data)
                         })
-                        .then(response => response.json())
+                        .then(async response => {
+                            const text = await response.text();
+                            let result = null;
+                            try {
+                                result = text ? JSON.parse(text) : null;
+                            } catch (e) {
+                                console.error('Non-JSON response from save_purchase_order.php:', text);
+                                if (response.status === 401) {
+                                    throw new Error('Your session has expired. Please open another tab, log in again, and retry saving.');
+                                }
+                                throw new Error('Server returned an invalid response (HTTP ' + response.status + '). ' + (text.length > 200 ? text.slice(0, 200) + '...' : text));
+                            }
+                            if (!response.ok) {
+                                throw new Error((result && result.message) ? result.message : 'HTTP ' + response.status + ' error');
+                            }
+                            return result;
+                        })
                         .then(result => {
-                            if (result.success) {
+                            if (result && result.success) {
                                 alert('Purchase order saved successfully!\nPO Number: ' + (result.po_number || data.po_number));
-                                // Optionally refresh the existing PO dropdown
                                 location.reload();
                             } else {
-                                alert('Failed to save purchase order: ' + result.message);
+                                alert('Failed to save purchase order: ' + (result && result.message ? result.message : 'Unknown error'));
                             }
                         })
                         .catch(error => {
@@ -1518,7 +1533,8 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                                     <?= floatval($item['item_number']) ?>,
                                     <?= json_encode($item['item_description']) ?>,
                                     <?= json_encode($item['quantity']) ?>,
-                                    <?= floatval($item['unit_cost']) ?>
+                                    <?= floatval($item['unit_cost']) ?>,
+                                    <?= json_encode($item['location'] ?? '') ?>
                                 );
                             <?php endforeach; ?>
                         }, 500);
