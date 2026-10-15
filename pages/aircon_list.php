@@ -1866,6 +1866,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <option value="Needs Repair">Needs Repair</option>
                                                 <option value="Under Maintenance">Under Maintenance</option>
                                                 <option value="Decommissioned">Decommissioned</option>
+                                                <option value="Not Applicable">Not Applicable</option>
                                             </select>
                                         </div>
 
@@ -2465,7 +2466,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     </thead>
                                     <tbody id="maintenanceTableBody">
                                         <tr>
-                                             <td colspan="<?= $can_manage_aircon ? 7 : 6 ?>" class="text-center">
+                                            <td colspan="<?= $can_manage_aircon ? 7 : 6 ?>" class="text-center">
                                                 <div class="spinner-border text-info" role="status">
                                                     <span class="visually-hidden">Loading...</span>
                                                 </div>
@@ -3886,7 +3887,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
             echo '<th>Maintenance Schedule</th>';
             echo '<th>Installation Date/ Release Date</th>';
             echo '<th>Notes</th>';
-                    if ($can_manage_aircon) echo '<th>Actions</th>';
+            if ($can_manage_aircon) echo '<th>Actions</th>';
             echo '</tr>';
             echo '</thead><tbody>';
 
@@ -3926,61 +3927,61 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '<td data-label="Installation Date/ Release Date">' . (!empty($row['installation_date']) ? date('M d, Y', strtotime($row['installation_date'])) : 'N/A') . '</td>';
                     echo '<td data-label="Notes">' . htmlspecialchars($row['notes'] ?? 'N/A') . '</td>';
                     if ($can_manage_aircon) {
-                    echo '<td data-label="Actions" class="actions">';
-                    echo '<button class="btn btn-sm btn-primary" title="View Details" onclick=\'viewAirconDetails('
-                        . (int)$row['aircon_id'] . ', '
-                        . htmlspecialchars(json_encode($row['item_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['maintenance_schedule'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['installation_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['energy_efficiency_rating'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['power_consumption'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['receiver'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['created_by'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['date_created'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['picture'] ?? ''), ENT_QUOTES, 'UTF-8')
-                        . ')\'><i class="fas fa-eye"></i></button> ';
-                    echo '<button class="btn btn-sm btn-info" title="Edit" onclick=\'openEditAirconModal('
-                        . (int)$row['aircon_id'] . ', '
-                        . htmlspecialchars(json_encode($row['item_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['category'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['maintenance_schedule'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . (int)($row['supplier_id'] ?? 0) . ', '
-                        . htmlspecialchars(json_encode($row['installation_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['energy_efficiency_rating'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['power_consumption'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
-                        . htmlspecialchars(json_encode($row['picture'] ?? ''), ENT_QUOTES, 'UTF-8')
-                        . ')\'><i class="fas fa-edit"></i></button> ';
+                        echo '<td data-label="Actions" class="actions">';
+                        echo '<button class="btn btn-sm btn-primary" title="View Details" onclick=\'viewAirconDetails('
+                            . (int)$row['aircon_id'] . ', '
+                            . htmlspecialchars(json_encode($row['item_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['maintenance_schedule'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['supplier_name'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['installation_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['energy_efficiency_rating'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['power_consumption'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['receiver'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['created_by'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['date_created'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['picture'] ?? ''), ENT_QUOTES, 'UTF-8')
+                            . ')\'><i class="fas fa-eye"></i></button> ';
+                        echo '<button class="btn btn-sm btn-info" title="Edit" onclick=\'openEditAirconModal('
+                            . (int)$row['aircon_id'] . ', '
+                            . htmlspecialchars(json_encode($row['item_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['category'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['maintenance_schedule'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . (int)($row['supplier_id'] ?? 0) . ', '
+                            . htmlspecialchars(json_encode($row['installation_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['energy_efficiency_rating'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['power_consumption'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['picture'] ?? ''), ENT_QUOTES, 'UTF-8')
+                            . ')\'><i class="fas fa-edit"></i></button> ';
 
-                    echo '<button class="btn btn-sm btn-danger" title="Delete" onclick=\'deleteAircon(' . (int)$row['aircon_id'] . ', ' . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ')\'><i class="fas fa-trash"></i></button></td>';
+                        echo '<button class="btn btn-sm btn-danger" title="Delete" onclick=\'deleteAircon(' . (int)$row['aircon_id'] . ', ' . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ')\'><i class="fas fa-trash"></i></button></td>';
                     } // end if can_manage_aircon
                     echo '</tr>';
                 }
@@ -4263,6 +4264,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <option value="Needs Repair">Needs Repair</option>
                                             <option value="Under Maintenance">Under Maintenance</option>
                                             <option value="Decommissioned">Decommissioned</option>
+                                            <option value="Not Applicable">Not Applicable</option>
                                         </select>
                                     </div>
                                     <div class="col-md-3">

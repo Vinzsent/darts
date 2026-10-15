@@ -3933,7 +3933,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 document.getElementById('edit_location').value = location || '';
                 document.getElementById('edit_status').value = status || 'Working';
                 document.getElementById('edit_campus').value = (campus && campus !== '0') ? campus : '';
-                
+
                 document.getElementById('edit_purchase_date').value = formatDate(purchase_date);
                 document.getElementById('edit_warranty_expiry').value = formatDate(warranty_expiry);
                 document.getElementById('edit_last_service').value = formatDate(last_service_date);
@@ -4126,6 +4126,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <option value="Needs Repair">Needs Repair</option>
                                             <option value="Under Maintenance">Under Maintenance</option>
                                             <option value="Decommissioned">Decommissioned</option>
+                                            <option value="Not Applicable">Not Applicable</option>
                                         </select>
                                     </div>
                                     <div class="col-md-3">
