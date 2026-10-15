@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $pageTitle = 'DARTS';
 include 'includes/auth.php';
 // db.php provides $conn â€” required by the profile card query further down.
@@ -879,6 +879,17 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         <p class="card-description">View all canvass request data submitted to multiple suppliers.</p>
         <a href="pages/canvass_form_list.php" class="card-button">Access</a>
       </div>
+
+      <!-- Aircon List Card -->
+      <div class="menu-card card-info">
+        <div class="card-icon">
+          <i class="fas fa-snowflake"></i>
+        </div>
+        <h3 class="card-title">Aircon List</h3>
+        <p class="card-description">Manage air conditioning units, monitor conditions, cleaning history, and maintenance records.</p>
+        <a href="pages/aircon_list.php" class="card-button">Access</a>
+      </div>
+
 
 
     <?php elseif ($user_type === 'supplyincharge'): ?>
