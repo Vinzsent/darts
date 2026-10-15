@@ -124,9 +124,11 @@ function savePurchaseOrder($data, $conn, $user_id) {
                 if (!empty($item['description'])) {
                     $item_number = $index + 1;
                     $description = $conn->real_escape_string(trim($item['description']));
-                    $quantity = floatval($item['quantity'] ?? 0);
+                    $raw_quantity = trim((string)($item['quantity'] ?? ''));
+                    $quantity_escaped = $conn->real_escape_string($raw_quantity);
+                    $num_quantity = floatval($raw_quantity);
                     $unit_cost = floatval($item['unit_cost'] ?? 0);
-                    $line_total = $quantity * $unit_cost;
+                    $line_total = $num_quantity * $unit_cost;
                     $total_amount += $line_total;
                     
                     // Route marker: 'supply' -> inventory, 'property' -> property_inventory.
@@ -137,10 +139,10 @@ function savePurchaseOrder($data, $conn, $user_id) {
                     $item_sql = $has_location
                         ? "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
-                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total, $location_sql)"
+                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total, $location_sql)"
                         : "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
+                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total)";
                     
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
