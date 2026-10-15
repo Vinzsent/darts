@@ -171,9 +171,11 @@ function savePurchaseOrder($data, $conn, $user_id)
                 if (!empty($item['description'])) {
                     $item_number = $index + 1;
                     $description = $conn->real_escape_string($item['description']);
-                    $quantity = floatval($item['quantity'] ?? 0);
+                    $raw_quantity = trim((string)($item['quantity'] ?? ''));
+                    $quantity_escaped = $conn->real_escape_string($raw_quantity);
+                    $num_quantity = floatval($raw_quantity);
                     $unit_cost = floatval($item['unit_cost'] ?? 0);
-                    $line_total = $quantity * $unit_cost;
+                    $line_total = $num_quantity * $unit_cost;
 
                     // Route marker: 'supply' -> inventory, 'property' -> property_inventory.
                     $location = po_normalize_location($item['location'] ?? '');
@@ -182,10 +184,10 @@ function savePurchaseOrder($data, $conn, $user_id)
                     $item_sql = po_location_column_exists($conn)
                         ? "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
-                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total, $location_sql)"
+                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total, $location_sql)"
                         : "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                            VALUES ($po_id, $item_number, '$description', $quantity, $unit_cost, $line_total)";
+                            VALUES ($po_id, $item_number, '$description', '$quantity_escaped', $unit_cost, $line_total)";
 
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
@@ -1138,14 +1140,14 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     const rows = document.querySelectorAll('#itemsTable tbody tr:not(:last-child)');
                     rows.forEach((row, index) => {
                         const descriptionElement = row.cells[1].querySelector('select') || row.cells[1].querySelector('input');
-                        const description = descriptionElement ? descriptionElement.value : '';
-                        const quantity = parseFloat(row.cells[2].querySelector('input').value) || 0;
-                        const unit_cost = parseFloat(row.cells[3].querySelector('input').value) || 0;
+                        const description = descriptionElement ? descriptionElement.value.trim() : '';
+                        const rawQuantity = row.cells[2].querySelector('input')?.value.trim() || '';
+                        const unit_cost = parseFloat(row.cells[3].querySelector('input')?.value) || 0;
 
-                        if (description && (quantity > 0 || unit_cost > 0)) {
+                        if (description && (rawQuantity !== '' || unit_cost > 0)) {
                             items.push({
                                 description: description,
-                                quantity: quantity,
+                                quantity: rawQuantity,
                                 unit_cost: unit_cost
                             });
                         }
@@ -1469,7 +1471,8 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     unitCostInput.value = unitCost;
 
                     // Calculate and display total
-                    const lineTotal = quantity * unitCost;
+                    const numQty = parseFloat(quantity) || 0;
+                    const lineTotal = numQty * unitCost;
                     newRow.cells[4].textContent = '₱' + lineTotal.toFixed(2);
 
                     // Recalculate grand total
@@ -1514,7 +1517,7 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                                 addPORowWithData(
                                     <?= floatval($item['item_number']) ?>,
                                     <?= json_encode($item['item_description']) ?>,
-                                    <?= floatval($item['quantity']) ?>,
+                                    <?= json_encode($item['quantity']) ?>,
                                     <?= floatval($item['unit_cost']) ?>
                                 );
                             <?php endforeach; ?>
