@@ -59,9 +59,10 @@ $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 
 // Search: match PO number, supplier, or any line item description.
 $search_term = trim($_GET['search'] ?? '');
+$status_filter = trim($_GET['status'] ?? '');
 
 // Server-side pagination: 20 purchase orders per page via ?page=N.
-// The search form only submits `search`, so a new search always lands on page 1.
+// The search form only submits `search` and `status`, so a new search always lands on page 1.
 $per_page = 5;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) {
@@ -87,7 +88,7 @@ $po_query = "
         MAX(COALESCE(ru.user_type, '')) as received_by_role,
         COUNT(poi.poi_id) as item_count,
         SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) as received_item_count,
-        SUM(COALESCE(poi.quantity, 0)) as ordered_qty_total,
+        SUM(COALESCE(CAST(poi.quantity AS DECIMAL(15,2)), 0)) as ordered_qty_total,
         SUM(CASE WHEN poi.is_received = 1 THEN COALESCE(poi.received_quantity, 0) ELSE 0 END) as received_qty_total
     FROM purchase_orders p
     LEFT JOIN `user` u ON p.created_by = u.id
@@ -102,14 +103,12 @@ $po_query = "
             WHERE si.po_id = p.po_id AND si.item_description LIKE ?
         )
     )
+    AND (? = '' OR p.status = ?)
     GROUP BY p.po_id, p.po_number, p.po_date, p.supplier_name, p.supplier_address,
              p.total_amount, p.status, p.notes, p.created_at, p.received_date, p.received_by, p.received_notes,
              $created_by_expr
     ORDER BY
-        -- Items already received (e.g. by the property custodian) come first,
-        -- fully-received POs ahead of partially-received ones, then newest.
-        (SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) > 0) DESC,
-        (SUM(CASE WHEN poi.is_received = 1 THEN 1 ELSE 0 END) = COUNT(poi.poi_id)) DESC,
+        p.po_date DESC,
         p.created_at DESC
 ";
 
@@ -124,7 +123,7 @@ $count_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM ($po_base_query) AS 
 if (!$count_stmt) {
     die("Database error preparing count query: " . $conn->error);
 }
-$count_stmt->bind_param("ssss", $search_term, $like, $like, $like);
+$count_stmt->bind_param("ssssss", $search_term, $like, $like, $like, $status_filter, $status_filter);
 $count_stmt->execute();
 $total_records = (int)($count_stmt->get_result()->fetch_assoc()['total'] ?? 0);
 $total_pages = max(1, (int)ceil($total_records / $per_page));
@@ -138,7 +137,7 @@ if (!$po_stmt) {
     die("Database error preparing query: " . $conn->error);
 }
 // Placeholder order is LIMIT then OFFSET: per_page first, offset second.
-$po_stmt->bind_param("ssssii", $search_term, $like, $like, $like, $per_page, $offset);
+$po_stmt->bind_param("ssssssii", $search_term, $like, $like, $like, $status_filter, $status_filter, $per_page, $offset);
 $po_stmt->execute();
 $po_result = $po_stmt->get_result();
 
@@ -185,11 +184,16 @@ $school_website = !empty($print_header['website']) ? $print_header['website'] : 
  */
 function po_fmt_qty($v)
 {
-    $s = (string)$v;
-    if (strpos($s, '.') !== false) {
-        $s = rtrim(rtrim($s, '0'), '.');
+    $s = trim((string)$v);
+    if ($s === '') return '0';
+    if (is_numeric($s)) {
+        if (strpos($s, '.') !== false) {
+            $s = rtrim(rtrim($s, '0'), '.');
+        }
+        return $s === '' ? '0' : $s;
     }
-    return $s === '' ? '0' : $s;
+    // Clean any trailing ".00" before units (e.g. "10.00 pcs" -> "10 pcs")
+    return preg_replace('/^(\d+)\.00(?=\s|$)/', '$1', $s);
 }
 
 /**
@@ -673,16 +677,21 @@ $verifier_name = 'Marilou L. Suarez';
             <h2 class="list-title">All Purchase Order Records</h2>
             <div class="action-buttons">
                 <form method="GET" action="purchase_order_list.php" class="d-flex align-items-center" style="gap:.5rem;">
+                    <select name="status" class="form-select form-select-sm" style="width: 140px; font-weight: 500;" onchange="this.form.submit()">
+                        <option value="">All Statuses</option>
+                        <option value="Draft" <?= ($status_filter === 'Draft') ? 'selected' : '' ?>>Draft</option>
+                        <option value="Received" <?= ($status_filter === 'Received') ? 'selected' : '' ?>>Received</option>
+                    </select>
                     <input type="text" name="search" id="poSearchInput" class="form-control form-control-sm"
                         placeholder="Search item, PO no., or supplier..."
                         value="<?= htmlspecialchars($search_term) ?>"
-                        style="width: 320px;" aria-label="Search purchase orders">
-                    <button type="submit" class="btn btn-sm" style="background:#fff;color:var(--primary-green);">
+                        style="width: 280px;" aria-label="Search purchase orders">
+                    <button type="submit" class="btn btn-sm" style="background:#fff;color:var(--primary-green);" title="Search">
                         <i class="fas fa-search"></i>
                     </button>
-                    <?php if ($search_term !== ''): ?>
+                    <?php if ($search_term !== '' || $status_filter !== ''): ?>
                         <a href="purchase_order_list.php" class="btn btn-sm" style="background:#fff;color:var(--primary-green);"
-                            title="Clear search">
+                            title="Clear search and filters">
                             <i class="fas fa-times"></i>
                         </a>
                     <?php endif; ?>
@@ -698,11 +707,17 @@ $verifier_name = 'Marilou L. Suarez';
             </div>
         </div>
 
-        <?php if ($search_term !== ''): ?>
+        <?php if ($search_term !== '' || $status_filter !== ''): ?>
             <div style="padding: 10px 20px; background:#e8f4ec; border-bottom:1px solid #d1dbd5; font-size:.9rem;">
                 <i class="fas fa-filter"></i>
-                Showing results for <strong><?= htmlspecialchars($search_term) ?></strong>
-                — purchase orders with <strong>already-received items are listed first</strong>.
+                Showing results
+                <?php if ($search_term !== ''): ?>
+                    for <strong><?= htmlspecialchars($search_term) ?></strong>
+                <?php endif; ?>
+                <?php if ($status_filter !== ''): ?>
+                    <?= ($search_term !== '' ? 'with status' : 'for status') ?> <strong><?= htmlspecialchars($status_filter) ?></strong>
+                <?php endif; ?>
+                — sorted by <strong>PO Date</strong>.
             </div>
         <?php endif; ?>
 
@@ -874,10 +889,13 @@ $verifier_name = 'Marilou L. Suarez';
             <?php
             // ── Pager ───────────────────────────────────────────────────────
             // Every link keeps the active search so paging never clears the filter.
-            $pager_link = static function ($p) use ($search_term) {
+            $pager_link = static function ($p) use ($search_term, $status_filter) {
                 $params = ['page' => $p];
                 if ($search_term !== '') {
                     $params['search'] = $search_term;
+                }
+                if ($status_filter !== '') {
+                    $params['status'] = $status_filter;
                 }
                 return 'purchase_order_list.php?' . http_build_query($params);
             };
@@ -1068,13 +1086,14 @@ $verifier_name = 'Marilou L. Suarez';
             // Quantity counter: ordered vs. actually received. Pending rows let
             // the receiver type how many units physically arrived (defaults to the
             // ordered qty); received rows show the tally that was saved.
-            // Trailing ".00" is stripped so quantities read as clean integers.
+            // Trailing ".00" is stripped while preserving non-numeric units (e.g. "10 pcs").
             const fmtQty = (v) => {
                 if (v === null || v === undefined || v === '') return '0';
-                const n = parseFloat(v);
-                if (Number.isNaN(n)) return String(v);
-                // Drop trailing ".00" but keep genuine fractions (5.5 stays 5.5).
-                return String(parseFloat(n.toFixed(4)));
+                const s = String(v).trim();
+                if (/^-?\d+(\.\d+)?$/.test(s)) {
+                    return String(parseFloat(parseFloat(s).toFixed(4)));
+                }
+                return s.replace(/^(\d+)\.00(?=\s|$)/, '$1');
             };
             const orderedQty = (item.quantity === null || item.quantity === undefined) ? 0 : item.quantity;
             const recvQtyRaw = (item.received_quantity === null || item.received_quantity === undefined || item.received_quantity === '') ?
@@ -1084,21 +1103,22 @@ $verifier_name = 'Marilou L. Suarez';
             // recorded count >= the ordered qty). Once fully received — or once the
             // whole PO is finalised (po.status === 'Received') — the row locks.
             const poFinalized = (po.status === 'Received');
-            const savedQty = (recvQtyRaw === null) ? parseFloat(orderedQty) : parseFloat(recvQtyRaw);
-            const isFull = savedQty >= parseFloat(orderedQty);
+            const numOrdered = parseFloat(orderedQty) || 0;
+            const numSaved = (recvQtyRaw === null) ? numOrdered : (parseFloat(recvQtyRaw) || 0);
+            const isFull = numSaved >= numOrdered;
 
             let qtyCell;
             if (poFinalized) {
                 // Locked after the PO is completed — show the final tally.
-                const short = (savedQty < parseFloat(orderedQty));
+                const short = (numSaved < numOrdered);
                 qtyCell = `<div style="line-height:1.2;"><strong>${fmtQty(orderedQty)}</strong> ordered` +
-                    `<br><span class="text-muted" style="font-size:.82rem;">${fmtQty(savedQty)} received</span>` +
+                    `<br><span class="text-muted" style="font-size:.82rem;">${fmtQty(numSaved)} received</span>` +
                     (short ? `<br><span class="badge bg-warning text-dark" style="font-size:.7rem;margin-top:2px;">short</span>` : ``) +
                     `</div>`;
             } else {
                 // Editable: prefill the input with whatever was last recorded.
                 qtyCell = `<div style="line-height:1.2;"><strong>${fmtQty(orderedQty)}</strong> ordered` +
-                    `<br><input type="number" min="0" max="${fmtQty(orderedQty)}" step="1" value="${fmtQty(savedQty)}" ` +
+                    `<br><input type="number" min="0" max="${numOrdered}" step="1" value="${numSaved}" ` +
                     `class="form-control form-control-sm recv-qty-input" data-poi-id="${item.poi_id}" ` +
                     `style="width:90px;display:inline-block;text-align:right;margin-top:2px;" ` +
                     `title="How many units actually arrived? (max ${fmtQty(orderedQty)})">` +
