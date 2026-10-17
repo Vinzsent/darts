@@ -808,6 +808,46 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
         <a href="pages/aircon_list.php" class="card-button">Access</a>
       </div>
 
+      <!-- Purchase Order (create) Card -->
+      <div class="menu-card card-warning">
+        <div class="card-icon">
+          <i class="fas fa-shopping-bag"></i>
+        </div>
+        <h3 class="card-title">Purchase Order</h3>
+        <p class="card-description">Create and issue new purchase orders for suppliers.</p>
+        <a href="pages/purchase_order.php" class="card-button">Access</a>
+      </div>
+
+      <!-- Purchase Order List Card -->
+      <div class="menu-card card-warning">
+        <div class="card-icon">
+          <i class="fas fa-clipboard-check"></i>
+        </div>
+        <h3 class="card-title">Purchase Order List</h3>
+        <p class="card-description">View and manage purchase orders, track orders, and monitor order status.</p>
+        <a href="pages/purchase_order_list.php" class="card-button">Access</a>
+      </div>
+
+      <!-- Supply Inventory Card -->
+      <div class="menu-card card-info">
+        <div class="card-icon">
+          <i class="fas fa-archive"></i>
+        </div>
+        <h3 class="card-title">Supply Inventory Management</h3>
+        <p class="card-description">Track real-time stock levels with detailed logs. Get alerts for low inventory and manage supplies.</p>
+        <a href="pages/Inventory.php" class="card-button">Access</a>
+      </div>
+
+      <!-- Property Inventory Card -->
+      <div class="menu-card card-info">
+        <div class="card-icon">
+          <i class="fas fa-warehouse"></i>
+        </div>
+        <h3 class="card-title">Property Inventory Management</h3>
+        <p class="card-description">Track real-time stock levels with detailed logs. Get alerts for low inventory and manage supplies.</p>
+        <a href="pages/property_inventory.php" class="card-button">Access</a>
+      </div>
+
     <?php elseif ($user_type === 'propertycustodian'): ?>
       <!-- Supply Requisition Card ONLY for School President -->
 
