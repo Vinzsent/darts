@@ -502,7 +502,7 @@ if (isset($_SESSION['error'])) {
         }
     }
 
-    function openEditModal(id, title, firstName, middleName, lastName, suffix, academicTitle, userType, username) {
+    function openEditModal(id, title, firstName, middleName, lastName, suffix, academicTitle, userType, username, department) {
         document.getElementById('edit-id').value = id;
         document.getElementById('edit-title').value = title;
         document.getElementById('edit-firstname').value = firstName;
@@ -512,6 +512,8 @@ if (isset($_SESSION['error'])) {
         document.getElementById('edit-academictitle').value = academicTitle || '';
         document.getElementById('edit-usertype').value = userType;
         document.getElementById('edit-username').value = username;
+        document.getElementById('edit-department').value = department || '';
+        document.getElementById('edit-password').value = '';
 
         // Show the edit modal
         document.getElementById('editUser').style.display = 'block';
