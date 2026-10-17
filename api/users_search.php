@@ -17,7 +17,7 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $search_param = "%$search%";
 
 // Count filtered users for pagination
-$count_query = "SELECT COUNT(*) as count FROM employees WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?)";
+$count_query = "SELECT COUNT(*) as count FROM `user` WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?)";
 $stmt_count = $conn->prepare($count_query);
 $stmt_count->bind_param("sss", $search_param, $search_param, $search_param);
 $stmt_count->execute();
@@ -27,7 +27,7 @@ $total_pages = max(1, (int) ceil($filtered_users / $records_per_page));
 if ($page > $total_pages) $page = $total_pages;
 $offset = ($page - 1) * $records_per_page;
 
-$stmt = $conn->prepare("SELECT * FROM employees WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?) ORDER BY last_name, first_name LIMIT ?, ?");
+$stmt = $conn->prepare("SELECT * FROM `user` WHERE (first_name LIKE ? OR last_name LIKE ? OR user_type LIKE ?) ORDER BY last_name, first_name LIMIT ?, ?");
 $stmt->bind_param("sssii", $search_param, $search_param, $search_param, $offset, $records_per_page);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -36,6 +36,7 @@ $result = $stmt->get_result();
 ob_start();
 if ($result->num_rows > 0):
     while ($row = $result->fetch_assoc()):
+        $row = array_map(fn($v) => $v ?? '', $row);
 ?>
         <tr>
             <td>
@@ -102,18 +103,38 @@ $rows_html = ob_get_clean();
 
 // Buffering HTML output for Pagination
 ob_start();
-if ($total_pages > 0):
+if ($total_pages > 1):
 ?>
     <nav aria-label="User pagination" class="mt-3">
         <ul class="pagination justify-content-center mb-0">
             <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
                 <a class="page-link ajax-pagination" href="#" data-page="<?= max(1, $page - 1) ?>">Previous</a>
             </li>
-            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+            <?php
+            // Windowed pager: current ± 3, with first/last + ellipses (keeps the bar short)
+            $start_page = max(1, $page - 3);
+            $end_page = min($total_pages, $page + 3);
+            if ($start_page > 1): ?>
+                <li class="page-item">
+                    <a class="page-link ajax-pagination" href="#" data-page="1">1</a>
+                </li>
+                <?php if ($start_page > 2): ?>
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                <?php endif; ?>
+            <?php endif; ?>
+            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
                 <li class="page-item <?= $page == $i ? 'active' : '' ?>">
                     <a class="page-link ajax-pagination" href="#" data-page="<?= $i ?>"><?= $i ?></a>
                 </li>
             <?php endfor; ?>
+            <?php if ($end_page < $total_pages): ?>
+                <?php if ($end_page < $total_pages - 1): ?>
+                    <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                <?php endif; ?>
+                <li class="page-item">
+                    <a class="page-link ajax-pagination" href="#" data-page="<?= $total_pages ?>"><?= $total_pages ?></a>
+                </li>
+            <?php endif; ?>
             <li class="page-item <?= $page >= $total_pages ? 'disabled' : '' ?>">
                 <a class="page-link ajax-pagination" href="#" data-page="<?= min($total_pages, $page + 1) ?>">Next</a>
             </li>
