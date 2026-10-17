@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Insert into the database
     $stmt = $conn->prepare("
-        INSERT INTO employees 
-        (title, first_name, middle_name, last_name, suffix, academic_title, user_type, department, username, password) 
+        INSERT INTO `user`
+        (title, first_name, middle_name, last_name, suffix, academic_title, user_type, department, username, password)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->bind_param("ssssssssss", 
