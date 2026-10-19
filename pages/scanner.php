@@ -155,10 +155,28 @@ include '../includes/header.php';
         if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
         if (html5QrCode) { stopScanner(); return; }
 
+        // Check Permissions Policy if supported by browser
+        if (document.permissionsPolicy && typeof document.permissionsPolicy.allowsFeature === 'function') {
+            if (!document.permissionsPolicy.allowsFeature('camera')) {
+                scannerStatus.textContent = '● Camera access is not allowed in this document (requires HTTPS).';
+                btnStart.textContent = 'Restart Scanner';
+                btnStart.classList.remove('btn-success');
+                btnStart.classList.add('btn-danger');
+                return;
+            }
+        }
+
         // Camera access requires a secure context (HTTPS or localhost)
-        if (location.protocol !== 'https:' &&
-            location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
             scannerStatus.textContent = '● Camera access requires HTTPS or localhost.';
+            btnStart.textContent = 'Restart Scanner';
+            btnStart.classList.remove('btn-success');
+            btnStart.classList.add('btn-danger');
+            return;
+        }
+
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            scannerStatus.textContent = '● Camera API is not supported in this browser context.';
             btnStart.textContent = 'Restart Scanner';
             btnStart.classList.remove('btn-success');
             btnStart.classList.add('btn-danger');

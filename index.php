@@ -743,7 +743,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // Add keyboard shortcuts
       document.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && (document.activeElement === emailInput || document.activeElement === passwordInput)) {
+        if (e.key === 'Enter' && (document.activeElement === usernameInput || document.activeElement === passwordInput)) {
           form.submit();
         }
       });
