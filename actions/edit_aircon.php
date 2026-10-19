@@ -32,6 +32,7 @@ $notes                = trim($_POST['notes'] ?? '');
 $purchase_price       = !empty($_POST['purchase_price']) ? floatval($_POST['purchase_price']) : null;
 $depreciated_value    = !empty($_POST['depreciated_value']) ? floatval($_POST['depreciated_value']) : null;
 $campus               = !empty($_POST['campus']) ? trim($_POST['campus']) : null;
+$lifespan              = trim($_POST['lifespan'] ?? '');
 // Handle Multiple Pictures Upload
 $new_pictures = [];
 if (isset($_FILES['pictures']) && is_array($_FILES['pictures']['name'])) {
@@ -108,6 +109,7 @@ $update_sql = "UPDATE aircons
                    purchase_price = ?,
                    depreciated_value = ?,
                    campus = ?,
+                   lifespan = ?,
                    date_updated = NOW()
                WHERE aircon_id = ?";
 
@@ -118,8 +120,8 @@ if (!$stmt) {
     exit();
 }
 
-// Bind parameters - 23 parameters
-$types = 'sssssssssssssissdsddsss';
+// Bind parameters - 24 parameters (types must match the column order above)
+$types = 'ssssssssssssssissdsddssi';
 $params = [
     $item_name,
     $category,
@@ -143,6 +145,7 @@ $params = [
     $purchase_price,
     $depreciated_value,
     $campus,
+    $lifespan,
     $aircon_id
 ];
 
@@ -152,6 +155,14 @@ if (!$stmt->execute()) {
     $_SESSION['error'] = 'Error updating aircon: ' . $stmt->error;
     header('Location: ../pages/aircon_list.php');
     exit();
+}
+
+// Refresh the unit's QR code (viewer URL payload is stable per id, but
+// regenerate when missing — e.g. legacy rows created before QR existed).
+require_once __DIR__ . '/../includes/aircon_qr.php';
+$qr_png = aircon_qr_png($aircon_id);
+if ($qr_png !== null) {
+    aircon_qr_persist($conn, $aircon_id, $qr_png);
 }
 
 // Insert additional pictures if any
