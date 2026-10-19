@@ -119,7 +119,7 @@ if (!$stmt) {
 }
 
 // Bind parameters - 23 parameters
-$types = 'sssssssssssssissdsddsis';
+$types = 'sssssssssssssissdsddsss';
 $params = [
     $item_name,
     $category,
