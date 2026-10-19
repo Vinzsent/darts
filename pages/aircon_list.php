@@ -1127,6 +1127,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-lifespan="<?= htmlspecialchars($aircon['lifespan'] ?? '', ENT_QUOTES) ?>"
                                                             data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
@@ -1229,6 +1230,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-lifespan="<?= htmlspecialchars($aircon['lifespan'] ?? '', ENT_QUOTES) ?>"
                                                             data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
@@ -1323,6 +1325,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
                                                             data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                             data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-lifespan="<?= htmlspecialchars($aircon['lifespan'] ?? '', ENT_QUOTES) ?>"
                                                             data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
                                                             data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
                                                             data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
@@ -1637,6 +1640,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     data-notes="<?= htmlspecialchars($row['notes'] ?? '', ENT_QUOTES) ?>"
                                                     data-purchase-price="<?= htmlspecialchars($row['purchase_price'] ?? '0', ENT_QUOTES) ?>"
                                                     data-depreciated-value="<?= htmlspecialchars($row['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                    data-lifespan="<?= htmlspecialchars($row['lifespan'] ?? '', ENT_QUOTES) ?>"
                                                     data-area="<?= htmlspecialchars($row['area'] ?? '', ENT_QUOTES) ?>"
                                                     data-receiver="<?= htmlspecialchars($row['receiver'] ?? '', ENT_QUOTES) ?>"
                                                     data-created-by="<?= htmlspecialchars($row['created_by'] ?? '', ENT_QUOTES) ?>"
@@ -1657,6 +1661,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     <?= htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
+                                                    <?= htmlspecialchars(json_encode($row['campus'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
@@ -1668,6 +1673,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     <?= htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') ?>,
+                                                    <?= htmlspecialchars(json_encode($row['lifespan'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['first_image'] ?? ''), ENT_QUOTES, 'UTF-8') ?>
                                                     )">
                                                     <i class="fas fa-edit"></i>
@@ -1933,6 +1939,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <input type="number" step="0.01" name="depreciated_value" class="form-control" placeholder="0.00">
                                         </div>
                                         <div class="col-md-3">
+                                            <label class="form-label">Lifespan</label>
+                                            <input type="text" name="lifespan" class="form-control" placeholder="e.g., 10 years">
+                                        </div>
+                                        <div class="col-md-3">
                                             <label class="form-label">Upload Pictures (Multiple)</label>
                                             <input type="file" name="pictures[]" id="aircon_picture_add" class="form-control" accept="image/*" multiple>
                                             <div id="picture_preview_container_add" class="mt-2" style="display:none;">
@@ -1976,6 +1986,64 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <div class="card-body">
                                             <div id="airconPicturesGallery" class="d-flex flex-wrap gap-2">
                                                 <!-- Images will be loaded dynamically via AJAX -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+            <style>
+                /* Default image placeholder used when an aircon has no uploaded picture. */
+                .aircon-default-pic {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    min-height: 180px;
+                    border: 2px dashed #dee2e6;
+                    border-radius: 10px;
+                    background: #f8f9fa;
+                    cursor: default;
+                    padding: 12px;
+                    text-align: center;
+                }
+                .aircon-default-pic img {
+                    width: 120px;
+                    height: 120px;
+                    object-fit: contain;
+                    color: var(--primary-green);
+                }
+                .aircon-default-caption {
+                    margin-top: 6px;
+                    font-size: 0.75rem;
+                    color: #6c757d;
+                    max-width: 220px;
+                }
+            </style>
+
+                                </div>
+
+                                <!-- QR Code Section (image streams from the qr_code blob column) -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-header text-white" style="background: linear-gradient(135deg, var(--primary-green), #0e5a2e);">
+                                            <h6 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                                <div id="viewQrWrap" class="text-center" style="min-width:170px;">
+                                                    <div id="viewQrSpinner" class="spinner-border text-success" role="status" style="display:none;">
+                                                        <span class="visually-hidden">Loading QR...</span>
+                                                    </div>
+                                                    <img id="viewQrImage" src="" alt="Aircon QR Code"
+                                                         style="display:none;width:160px;height:160px;object-fit:contain;border:1px solid #dee2e6;border-radius:10px;background:#fff;padding:6px;">
+                                                    <div id="viewQrEmpty" class="text-muted small">No QR code stored for this unit yet.</div>
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <p class="text-muted small mb-2">Scan this code to identify the unit. The image is served straight from the database blob.</p>
+                                                    <button type="button" class="btn btn-sm btn-outline-success" id="viewQrRegenBtn">
+                                                        <i class="fas fa-rotate me-1"></i>Generate / Refresh QR
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -2108,6 +2176,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <div class="col-md-6">
                                                     <label class="text-muted small">Power Consumption (kW)</label>
                                                     <p class="fw-bold mb-0" id="view_power_consumption">-</p>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="text-muted small">Lifespan</label>
+                                                    <p class="fw-bold mb-0" id="view_lifespan">-</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -2694,6 +2766,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         const notes = button.data('notes') || '';
                         const purchasePrice = button.data('purchase-price') || '0';
                         const depreciatedValue = button.data('depreciated-value') || '0';
+                        const lifespan = button.data('lifespan') || '';
                         const receiver = button.data('receiver') || '';
                         const createdBy = button.data('created-by') || '';
                         const dateCreated = button.data('date-created') || '';
@@ -2705,7 +2778,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             airconId, itemNumber, brand, model, type, capacity, serialNumber,
                             location, area, status, purchaseDate, warrantyExpiry, lastServiceDate,
                             maintenanceSchedule, supplierInfo, installationDate, energyEfficiency,
-                            powerConsumption, notes, purchasePrice, depreciatedValue, receiver,
+                            powerConsumption, notes, purchasePrice, depreciatedValue, lifespan, receiver,
                             createdBy, dateCreated, picture
                         );
 
@@ -3671,7 +3744,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 // Function to view aircon details
                 function viewAirconDetails(airconId, itemNumber, brand, model, type, capacity, serialNumber, location, area, status,
                     purchaseDate, warrantyExpiry, lastServiceDate, maintenanceSchedule, supplierInfo, installationDate,
-                    energyEfficiency, powerConsumption, notes, purchasePrice, depreciatedValue, receiver, createdBy, dateCreated, picture) {
+                    energyEfficiency, powerConsumption, notes, purchasePrice, depreciatedValue, lifespan, receiver, createdBy, dateCreated, picture) {
 
                     // Populate modal fields
                     document.getElementById('view_aircon_id').textContent = airconId || 'N/A';
@@ -3695,6 +3768,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
                     document.getElementById('view_energy_efficiency_rating').textContent = energyEfficiency || 'N/A';
                     document.getElementById('view_power_consumption').textContent = powerConsumption || 'N/A';
+                    document.getElementById('view_lifespan').textContent = lifespan || 'N/A';
                     document.getElementById('view_notes').textContent = notes || 'N/A';
 
                     // Format currency
@@ -3709,6 +3783,62 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
                     document.getElementById('view_created_by').textContent = createdBy || 'N/A';
                     document.getElementById('view_date_created').textContent = dateCreated ? formatDateTime(dateCreated) : 'N/A';
+
+                    // Load the QR image from the qr_code blob (via streaming endpoint).
+                    (function() {
+                        var qrImg = document.getElementById('viewQrImage');
+                        var qrSpin = document.getElementById('viewQrSpinner');
+                        var qrEmpty = document.getElementById('viewQrEmpty');
+                        if (!qrImg) return;
+                        qrImg.style.display = 'none';
+                        qrImg.removeAttribute('src');
+                        if (qrEmpty) qrEmpty.style.display = 'none';
+                        if (qrSpin) qrSpin.style.display = 'inline-block';
+                        var probe = new Image();
+                        probe.onload = function() {
+                            if (qrSpin) qrSpin.style.display = 'none';
+                            qrImg.src = probe.src;
+                            qrImg.style.display = 'inline-block';
+                        };
+                        probe.onerror = function() {
+                            if (qrSpin) qrSpin.style.display = 'none';
+                            if (qrEmpty) qrEmpty.style.display = 'block';
+                        };
+                        probe.src = '../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&t=' + Date.now();
+                    })();
+
+                    // (Re)generate the QR on demand, then reload the visual.
+                    var qrRegenBtn = document.getElementById('viewQrRegenBtn');
+                    if (qrRegenBtn) {
+                        qrRegenBtn.onclick = function() {
+                            var qrImg = document.getElementById('viewQrImage');
+                            var qrSpin = document.getElementById('viewQrSpinner');
+                            var qrEmpty = document.getElementById('viewQrEmpty');
+                            if (qrSpin) qrSpin.style.display = 'inline-block';
+                            if (qrEmpty) qrEmpty.style.display = 'none';
+                            if (qrImg) qrImg.style.display = 'none';
+                            fetch('../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&regen=1&t=' + Date.now(), { credentials: 'same-origin' })
+                                .then(function(res) {
+                                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                                    return res.blob();
+                                })
+                                .then(function(blob) {
+                                    if (qrSpin) qrSpin.style.display = 'none';
+                                    if (qrImg) {
+                                        if (qrImg.src && qrImg.src.indexOf('blob:') === 0) URL.revokeObjectURL(qrImg.src);
+                                        qrImg.src = URL.createObjectURL(blob);
+                                        qrImg.style.display = 'inline-block';
+                                    }
+                                })
+                                .catch(function() {
+                                    if (qrSpin) qrSpin.style.display = 'none';
+                                    if (qrEmpty) {
+                                        qrEmpty.textContent = 'Could not generate the QR code for this unit.';
+                                        qrEmpty.style.display = 'block';
+                                    }
+                                });
+                        };
+                    }
 
                     // Update pictures gallery
                     const gallery = document.getElementById('airconPicturesGallery');
@@ -3739,7 +3869,11 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     gallery.appendChild(imgContainer);
                                 });
                             } else {
-                                gallery.innerHTML = '<p class="text-muted italic">No pictures available for this unit.</p>';
+                                gallery.innerHTML =
+                                    '<div class="aircon-default-pic" title="No picture uploaded for this unit">' +
+                                    '<img src="../uploads/DCC2.png" alt="DCC2 default logo">' +
+                                    '<div class="aircon-default-caption">No picture for this unit</div>' +
+                                    '</div>';
                             }
                         })
                         .catch(error => {
@@ -3950,6 +4084,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['lifespan'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['receiver'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['created_by'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['date_created'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -3967,6 +4102,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['status'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['campus'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['purchase_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['warranty_expiry'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['last_service_date'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -3978,6 +4114,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             . htmlspecialchars(json_encode($row['notes'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['purchase_price'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['depreciated_value'] ?? '0'), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['lifespan'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['picture'] ?? ''), ENT_QUOTES, 'UTF-8')
                             . ')\'><i class="fas fa-edit"></i></button> ';
 
@@ -4041,9 +4178,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
         <script>
             // Add this to your aircon_list.php, preferably in the head section or before the closing body tag
             function openEditAirconModal(
-                aircon_id, item_name, category, brand, model, type, capacity, serial_number, location, area, status,
+                aircon_id, item_name, category, brand, model, type, capacity, serial_number, location, area, status, campus,
                 purchase_date, warranty_expiry, last_service_date, maintenance_schedule, supplier_id,
-                installation_date, energy_efficient, power_consumption, notes, purchase_price, depreciated_value, picture
+                installation_date, energy_efficient, power_consumption, notes, purchase_price, depreciated_value, lifespan, picture
             ) {
                 // Format dates for input fields (YYYY-MM-DD)
                 const formatDate = (dateString) => {
@@ -4066,6 +4203,35 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 document.getElementById('edit_location').value = location || '';
                 document.getElementById('edit_area').value = area || '';
                 document.getElementById('edit_status').value = status || 'Working';
+                // Campus: DB holds BED/TED (case-insensitive); tolerate null/0/whitespace.
+                // Also handle legacy values that are not in the dropdown: add a
+                // temporary selected option instead of silently resetting to blank.
+                (function() {
+                    var campusSel = document.getElementById('edit_campus');
+                    if (!campusSel) return;
+                    var norm = (campus === null || campus === undefined) ? '' : String(campus).trim();
+                    if (norm === '0') norm = '';
+                    var upper = norm.toUpperCase();
+                    var match = '';
+                    for (var i = 0; i < campusSel.options.length; i++) {
+                        if (campusSel.options[i].value.toUpperCase() === upper && upper !== '') {
+                            match = campusSel.options[i].value;
+                            break;
+                        }
+                    }
+                    if (match !== '') {
+                        campusSel.value = match;
+                    } else if (norm !== '') {
+                        var tmp = document.createElement('option');
+                        tmp.value = norm;
+                        tmp.textContent = norm + ' (saved value)';
+                        tmp.selected = true;
+                        campusSel.appendChild(tmp);
+                        campusSel.value = norm;
+                    } else {
+                        campusSel.value = '';
+                    }
+                })();
                 document.getElementById('edit_purchase_date').value = formatDate(purchase_date);
                 document.getElementById('edit_warranty_expiry').value = formatDate(warranty_expiry);
                 document.getElementById('edit_last_service').value = formatDate(last_service_date);
@@ -4077,6 +4243,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 document.getElementById('edit_notes').value = notes || '';
                 document.getElementById('edit_purchase_price').value = purchase_price || '';
                 document.getElementById('edit_depreciated_value').value = depreciated_value || '';
+                document.getElementById('edit_lifespan').value = lifespan || '';
 
                 // Reset previews and buffers
                 clearImagePreview('edit');
@@ -4091,6 +4258,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     .then(response => response.json())
                     .then(data => {
                         existingGallery.innerHTML = '';
+                        existingContainer.style.display = 'block';
+
                         if (data.success && data.images.length > 0) {
                             data.images.forEach(imgUrl => {
                                 const wrapper = document.createElement('div');
@@ -4140,7 +4309,21 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 existingGallery.appendChild(wrapper);
                             });
                         } else {
-                            existingContainer.style.display = 'none';
+                            const wrapper = document.createElement('div');
+                            wrapper.className = 'aircon-default-pic';
+                            wrapper.title = 'No picture uploaded for this unit';
+                            const img = document.createElement('img');
+                            img.src = '../uploads/DCC2.png';
+                            img.alt = 'DCC2 default logo';
+                            img.style.width = '80px';
+                            img.style.height = '80px';
+                            img.style.objectFit = 'cover';
+                            const cap = document.createElement('div');
+                            cap.className = 'aircon-default-caption';
+                            cap.textContent = 'No picture for this unit';
+                            wrapper.appendChild(img);
+                            wrapper.appendChild(cap);
+                            existingGallery.appendChild(wrapper);
                         }
                     });
 
@@ -4180,18 +4363,24 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
         <!-- Edit Aircon Modal -->
         <div class="modal fade" id="editAirconModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header" style="background-color: var(--primary-green);">
-                        <h5 class="modal-title text-white">Edit Aircon Details</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-dialog modal-xl modal-dialog-scrollable aircon-edit-dialog">
+                <div class="modal-content aircon-edit-modal">
+                    <div class="modal-header aircon-edit-header">
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="aircon-edit-icon"><i class="fas fa-snowflake"></i></span>
+                            <div>
+                                <h5 class="modal-title text-white mb-0">Edit Aircon Details</h5>
+                                <small class="aircon-edit-subtitle">Update unit information &amp; inventory record</small>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <form action="../actions/edit_aircon.php" method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="aircon_id" id="edit_aircon_id">
-                        <div class="modal-body">
+                        <div class="modal-body aircon-edit-body">
                             <!-- Basic Information -->
-                            <div class="mb-3 pb-2 border-bottom">
-                                <h6 class="mb-3 text-uppercase text-muted">Basic Information</h6>
+                            <div class="aircon-edit-section">
+                                <h6 class="aircon-edit-section-title"><i class="fas fa-circle-info me-2"></i>Basic Information</h6>
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Item Number</label>
@@ -4331,6 +4520,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <input type="number" step="0.01" name="depreciated_value" id="edit_depreciated_value" class="form-control" placeholder="0.00">
                                     </div>
                                     <div class="col-md-3">
+                                        <label class="form-label">Lifespan</label>
+                                        <input type="text" name="lifespan" id="edit_lifespan" class="form-control" placeholder="e.g., 10 years">
+                                    </div>
+                                    <div class="col-md-3">
                                         <label class="form-label">Update/Add Pictures (Multiple)</label>
                                         <input type="file" name="pictures[]" id="aircon_picture_edit" class="form-control" accept="image/*" multiple>
                                         <div id="existing_pictures_container" class="mt-2" style="display:none;">
@@ -4348,11 +4541,134 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 </div>
                             </div>
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button>
+                        <div class="modal-footer aircon-edit-footer">
+                            <button type="button" class="btn aircon-btn-ghost" data-bs-dismiss="modal"><i class="fas fa-xmark me-1"></i>Cancel</button>
+                            <button type="submit" class="btn aircon-btn-save"><i class="fas fa-save me-1"></i>Save Changes</button>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
+
+        <style>
+            /* Modern Edit Aircon modal — keeps the page palette (primary-green,
+               dark-green, accent-orange/gold, bg-light). Scoped classes only. */
+            .aircon-edit-modal {
+                border: none;
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 24px 60px rgba(7, 59, 29, 0.35);
+            }
+            .aircon-edit-header {
+                background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+                border-bottom: 3px solid var(--accent-orange);
+                padding: 1.1rem 1.4rem;
+            }
+            .aircon-edit-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 46px;
+                height: 46px;
+                border-radius: 12px;
+                background: rgba(255, 255, 255, 0.14);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                color: var(--accent-orange);
+                font-size: 1.3rem;
+            }
+            /* Wider dialog for the enlarged modal (modal-xl caps at 1140px;
+               stretch a bit further on large screens). */
+            .aircon-edit-dialog {
+                max-width: 1240px;
+            }
+            @media (max-width: 1300px) {
+                .aircon-edit-dialog {
+                    max-width: 96vw;
+                }
+            }
+            .aircon-edit-subtitle {
+                color: rgba(255, 255, 255, 0.75);
+                font-size: 0.8rem;
+            }
+            .aircon-edit-body {
+                background: var(--bg-light);
+                padding: 1.4rem;
+            }
+            .aircon-edit-section {
+                background: #fff;
+                border: 1px solid #e5e9e4;
+                border-left: 4px solid var(--primary-green);
+                border-radius: 12px;
+                padding: 1.2rem 1.2rem 0.4rem;
+                box-shadow: 0 2px 10px rgba(7, 59, 29, 0.06);
+            }
+            .aircon-edit-section-title {
+                color: var(--primary-green);
+                font-weight: 700;
+                font-size: 0.82rem;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                margin-bottom: 1rem;
+                padding-bottom: 0.6rem;
+                border-bottom: 2px solid #eef1ec;
+            }
+            .aircon-edit-section-title i {
+                color: var(--accent-orange);
+            }
+            .aircon-edit-body .form-label {
+                font-weight: 600;
+                font-size: 0.82rem;
+                color: var(--text-dark);
+                margin-bottom: 0.35rem;
+            }
+            .aircon-edit-body .form-control,
+            .aircon-edit-body .form-select {
+                border-radius: 8px;
+                border: 1px solid #dfe3dc;
+                font-size: 0.9rem;
+                padding: 0.55rem 0.75rem;
+                transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            }
+            .aircon-edit-body .form-control:focus,
+            .aircon-edit-body .form-select:focus {
+                border-color: var(--primary-green);
+                box-shadow: 0 0 0 0.2rem rgba(7, 59, 29, 0.15);
+            }
+            .aircon-edit-footer {
+                background: #fff;
+                border-top: 1px solid #e5e9e4;
+                padding: 0.9rem 1.4rem;
+            }
+            .aircon-btn-ghost {
+                border: 1px solid #cfd4cd;
+                color: var(--text-dark);
+                border-radius: 8px;
+                font-weight: 600;
+                padding: 0.55rem 1.2rem;
+            }
+            .aircon-btn-ghost:hover {
+                background: #eef1ec;
+                border-color: #b9bfb6;
+            }
+            .aircon-btn-save {
+                background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%);
+                border: none;
+                color: #fff;
+                border-radius: 8px;
+                font-weight: 600;
+                padding: 0.55rem 1.4rem;
+                box-shadow: 0 4px 12px rgba(7, 59, 29, 0.3);
+            }
+            .aircon-btn-save:hover {
+                color: var(--accent-orange);
+                transform: translateY(-1px);
+                box-shadow: 0 6px 16px rgba(7, 59, 29, 0.35);
+            }
+            @media (max-width: 576px) {
+                .aircon-edit-body {
+                    padding: 1rem;
+                }
+                .aircon-edit-section {
+                    padding: 1rem 1rem 0.3rem;
+                }
+            }
