@@ -658,6 +658,16 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
   </div>
 
   <div class="menu-grid">
+    <?php if ($user_type === 'admin' || $user_type === 'purchasing officer' || $user_type === 'supply incharge' || $user_type === 'property custodian'): ?>
+      <div class="menu-card card-info">
+        <div class="card-icon">
+          <i class="fas fa-qrcode"></i>
+        </div>
+        <h3 class="card-title">QR Scanner</h3>
+        <p class="card-description">Scan and track QR-coded assets in real-time.</p>
+        <a href="pages/scanner.php" class="card-button">Access</a>
+      </div>
+    <?php endif; ?>
     <?php if ($user_type === 'faculty' || $user_type === 'staff'): ?>
       <!-- Supply Requisition Card ONLY for Faculty -->
       <div class="menu-card">
