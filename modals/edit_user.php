@@ -1,5 +1,9 @@
-<form action="../actions/edit_user.php" method="POST" class="edit-user-form">
+<form action="../actions/edit_user.php" method="POST" class="edit-user-form" id="editUserForm">
   <input type="hidden" name="id" id="edit-id">
+
+  <!-- Inline error box: shows the server's failure reason without leaving the modal.
+       Filled by the AJAX submit handler in pages/users.php; hidden on success. -->
+  <div id="editUserError" class="alert alert-danger d-none" role="alert" style="white-space:pre-wrap;word-break:break-word;"></div>
 
   <!-- Personal Information Section -->
   <div class="form-section mb-4">
