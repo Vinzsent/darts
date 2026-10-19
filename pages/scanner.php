@@ -1,12 +1,20 @@
-﻿<?php
+<?php
 $pageTitle = 'QR Scanner';
 include '../includes/auth.php';
 include '../includes/db.php';
 include '../includes/header.php';
 ?>
 <?php include '../includes/sidebar.php'; ?>
+<style>
+  @media (min-width: 992px) {
+    .scanner-main-content {
+      margin-left: 270px;
+      max-width: calc(100% - 290px);
+    }
+  }
+</style>
 
-<main class="container py-4">
+<main class="container py-4 scanner-main-content">
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
         <h1 class="h4 mb-0"><i class="fas fa-qrcode text-primary mr-2"></i>QR Scanner</h1>
         <span class="badge bg-secondary">Mobile</span>

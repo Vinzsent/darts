@@ -7,8 +7,6 @@
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 
-<!-- Tailwind CSS CDN (Optional: Remove if already in header) -->
-<script src="https://cdn.tailwindcss.com"></script>
 
 <div class="sidebar no-print flex flex-col h-screen w-64 bg-[#073b1d] text-white fixed left-0 top-0 z-50 shadow-2xl transition-all duration-300 ease-in-out">
     <!-- Sidebar Header -->

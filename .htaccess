@@ -1,5 +1,15 @@
-# Allow QR Scanner scripts (inline + local assets)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Rewrite legacy /darts/ requests to current root
+    RewriteRule ^darts/(.*)$ $1 [L,QSA]
+</IfModule>
+
+# Security & Content Security Policy Headers
 <IfModule mod_headers.c>
+    Header always unset Content-Security-Policy
     Header unset Content-Security-Policy
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; img-src 'self' data:; connect-src 'self'; font-src 'self' https://cdnjs.cloudflare.com;"
+    Header set Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://code.jquery.com; script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' blob: https:; worker-src 'self' blob:;"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
 </IfModule>

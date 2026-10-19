@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Preserve sidebar styling against Bootstrap link/button defaults */
+.sidebar,
+.sidebar.bg-\[\#073b1d\] {
+  background-color: #073b1d !important;
+}
+
+.sidebar a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.sidebar a:hover {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.sidebar button {
+  color: inherit;
+}
