@@ -503,6 +503,12 @@ if (isset($_SESSION['error'])) {
     }
 
     function openEditModal(id, title, firstName, middleName, lastName, suffix, academicTitle, userType, username, department) {
+        // Clear any previous inline submit error.
+        var editErrorBox = document.getElementById('editUserError');
+        if (editErrorBox) {
+            editErrorBox.textContent = '';
+            editErrorBox.classList.add('d-none');
+        }
         document.getElementById('edit-id').value = id;
         document.getElementById('edit-title').value = title;
         document.getElementById('edit-firstname').value = firstName;
@@ -587,6 +593,96 @@ if (isset($_SESSION['error'])) {
     document.addEventListener('DOMContentLoaded', function() {
         var searchInput = document.getElementById('userSearch');
         var pagination = document.getElementById('usersPagination');
+        var editForm = document.getElementById('editUserForm');
+        var editErrorBox = document.getElementById('editUserError');
+
+        function showEditError(message) {
+            if (!editErrorBox) {
+                alert(message);
+                return;
+            }
+            editErrorBox.textContent = message;
+            editErrorBox.classList.remove('d-none');
+            editErrorBox.scrollIntoView({
+                block: 'nearest'
+            });
+        }
+
+        function hideEditError() {
+            if (editErrorBox) {
+                editErrorBox.textContent = '';
+                editErrorBox.classList.add('d-none');
+            }
+        }
+
+        // Submit the edit form via AJAX so a server failure shows its message
+        // inside the modal instead of navigating to a blank HTTP 500 page.
+        if (editForm) {
+            editForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                hideEditError();
+                var submitBtn = editForm.querySelector('button[type="submit"]');
+                var originalLabel = submitBtn ? submitBtn.innerHTML : '';
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Updating...';
+                }
+                fetch(editForm.action, {
+                        method: 'POST',
+                        body: new FormData(editForm),
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    })
+                    .then(function(res) {
+                        var contentType = res.headers.get('content-type') || '';
+                        if (contentType.indexOf('application/json') !== -1) {
+                            return res.json().then(function(data) {
+                                return {
+                                    status: res.status,
+                                    ok: res.ok,
+                                    data: data
+                                };
+                            });
+                        }
+                        // Non-JSON reply (e.g. a fatal-error HTML page): surface
+                        // the status + first part of the body as the message.
+                        return res.text().then(function(text) {
+                            var snippet = (text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 500);
+                            return {
+                                status: res.status,
+                                ok: res.ok,
+                                data: {
+                                    success: false,
+                                    message: 'Server returned HTTP ' + res.status + (snippet ? ': ' + snippet : '.')
+                                }
+                            };
+                        });
+                    })
+                    .then(function(result) {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalLabel;
+                        }
+                        if (result.ok && result.data && result.data.success !== false) {
+                            document.getElementById('editUser').style.display = 'none';
+                            alert((result.data && result.data.message) || 'User updated successfully!');
+                            loadUsers(1, searchInput ? searchInput.value.trim() : '');
+                        } else {
+                            showEditError('Failed to update user (HTTP ' + result.status + '). ' + ((result.data && result.data.message) || 'Unknown server error.'));
+                        }
+                    })
+                    .catch(function(err) {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalLabel;
+                        }
+                        showEditError('Failed to update user: could not reach the server. ' + (err && err.message ? err.message : err));
+                    });
+            });
+        }
 
         // Initial load (page 1)
         loadUsers(1, '');
