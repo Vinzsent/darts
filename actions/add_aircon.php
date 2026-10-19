@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $depreciated_value = !empty($_POST['depreciated_value']) ? floatval($_POST['depreciated_value']) : 0.00;
     $receiver = trim($_POST['receiver'] ?? 'Property Custodian');
     $supplier_id = !empty($_POST['supplier_id']) ? intval($_POST['supplier_id']) : null;
+    $lifespan = trim($_POST['lifespan'] ?? '');
     $picture = '';
     $additional_pictures = [];
     $campus = !empty($_POST['campus']) ? trim($_POST['campus']) : null;
@@ -82,8 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         supplier_id,
         created_by, 
         date_created,
-        campus
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)";
+        campus,
+        lifespan
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)";
 
     $stmt = $conn->prepare($sql);
 
@@ -93,9 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // Bind parameters - 22 parameters
+    // Bind parameters - 24 parameters (order must match the columns above)
     $stmt->bind_param(
-        "sssssssssssssssdsddsiis",
+        "sssssssssssssssdsddsiiss",
         $item_name,
         $category,
         $brand,
@@ -118,11 +120,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $receiver,
         $supplier_id,
         $user_id,
-        $campus
+        $campus,
+        $lifespan
     );
 
     if ($stmt->execute()) {
         $aircon_id = $conn->insert_id;
+
+        // Generate + store the unit's QR code (viewer URL payload).
+        require_once __DIR__ . '/../includes/aircon_qr.php';
+        $qr_png = aircon_qr_png((int)$aircon_id);
+        if ($qr_png !== null) {
+            aircon_qr_persist($conn, (int)$aircon_id, $qr_png);
+        }
 
         // Insert additional pictures if any
         if (!empty($additional_pictures)) {
