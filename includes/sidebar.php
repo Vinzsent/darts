@@ -40,6 +40,9 @@ if ($sidebar_file) {
     include_once($sidebar_path . $sidebar_file);
 }
 
+// Render the mobile off-canvas drawer with the same role menu (slides in on small screens).
+include __DIR__ . '/mobile_sidebar.php';
+
 // Keep sidebar scroll position across page loads + keep active link in view
 ?>
 <script>
