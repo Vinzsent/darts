@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $pageTitle = 'QR Scanner';
 include '../includes/auth.php';
 include '../includes/db.php';
@@ -76,7 +76,7 @@ include '../includes/header.php';
     </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/dist/html5-qrcode.min.js"></script>
+<script src="../assets/js/html5-qrcode.min.js"></script>
 <style>
     .aircon-default-pic {
         display: flex;
@@ -147,21 +147,40 @@ include '../includes/header.php';
         if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
         if (html5QrCode) { stopScanner(); return; }
 
-        scannerStatus.textContent = '● Requesting camera access…';
-        scannerTitle.textContent = 'Scanning…';
+        // Camera access requires a secure context (HTTPS or localhost)
+        if (location.protocol !== 'https:' &&
+            location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            scannerStatus.textContent = '● Camera access requires HTTPS or localhost.';
+            btnStart.textContent = 'Restart Scanner';
+            btnStart.classList.remove('btn-success');
+            btnStart.classList.add('btn-danger');
+            return;
+        }
+
+        scannerStatus.textContent = '● Requesting camera access�';
+        scannerTitle.textContent = 'Scanning�';
 
         Html5Qrcode.getCameras().then(function (cameras) {
-            var facing = (cameras.length > 0) ? { exact: 'environment' } : undefined;
+            if (!cameras || cameras.length === 0) {
+                throw new Error('No camera found on this device.');
+            }
+            // Prefer environment (rear) camera, fall back to first available (e.g. webcam)
+            var envCam = cameras.find(function (c) { return c.facing === 'environment'; });
+            var cameraConfig = envCam ? envCam.id : cameras[0].id;
             html5QrCode = new Html5Qrcode('scanner-container');
-            return html5QrCode.start(facing, { fps: 10, qrbox: 260 }, onDecode, onError);
+            return html5QrCode.start(cameraConfig, { fps: 10, qrbox: 260 }, onDecode, onError);
         }).catch(function (err) {
-            scannerStatus.textContent = '● ' + (err && err.message ? err.message : 'Camera unavailable');
+            var msg = err && err.message ? err.message : 'Camera unavailable';
+            if (msg.indexOf('environment') !== -1 || msg.indexOf('facing') !== -1 ||
+                msg.indexOf('constraint') !== -1) {
+                msg = 'No rear camera found. Grant camera access and retry.';
+            }
+            scannerStatus.textContent = '● ' + msg;
             btnStart.textContent = 'Restart Scanner';
             btnStart.classList.remove('btn-success');
             btnStart.classList.add('btn-danger');
         });
     }
-
     function stopScanner() {
         if (!html5QrCode) return;
         html5QrCode.stop().then(function () {

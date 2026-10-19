@@ -1,0 +1,5 @@
+# Allow QR Scanner scripts (inline + local assets)
+<IfModule mod_headers.c>
+    Header unset Content-Security-Policy
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; img-src 'self' data:; connect-src 'self'; font-src 'self' https://cdnjs.cloudflare.com;"
+</IfModule>
