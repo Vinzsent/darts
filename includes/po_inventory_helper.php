@@ -674,6 +674,11 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
             }
         }
 
+        // Ensure existing item has a valid qr_code
+        $prefix = ($table === 'property_inventory') ? 'PROP' : 'INV';
+        $fallback_qr = $prefix . '-' . str_pad($inv_id, 5, '0', STR_PAD_LEFT);
+        $conn->query("UPDATE `{$table}` SET qr_code = COALESCE(NULLIF(qr_code, ''), '{$fallback_qr}'), qrcode = COALESCE(NULLIF(qrcode, ''), '{$fallback_qr}') WHERE inventory_id = {$inv_id}");
+
         po_record_item_link($conn, $table, $inv_id, $poi_id, $po_id, $desc, $qty);
 
         po_write_stock_log($conn, $table, $inv_id, $qty, $prev, $new,
@@ -713,6 +718,16 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
     $new_id = (int)$conn->insert_id;
     $ins->close();
 
+    // Automatically generate and assign alphanumeric QR code
+    $prefix = ($table === 'property_inventory') ? 'PROP' : 'INV';
+    $generated_qr = $prefix . '-' . str_pad($new_id, 5, '0', STR_PAD_LEFT);
+    $qr_up = $conn->prepare("UPDATE `{$table}` SET qr_code = ?, qrcode = ? WHERE inventory_id = ?");
+    if ($qr_up) {
+        $qr_up->bind_param('ssi', $generated_qr, $generated_qr, $new_id);
+        $qr_up->execute();
+        $qr_up->close();
+    }
+
     po_record_item_link($conn, $table, $new_id, $poi_id, $po_id, $desc, $qty);
 
     po_write_stock_log($conn, $table, $new_id, $qty, 0, $qty,
@@ -720,5 +735,6 @@ function po_post_item_to_inventory($conn, $po, $item, $target = 'supply', $user_
 
     return ['status' => 'created', 'inventory_id' => $new_id, 'new_stock' => $qty,
             'target' => $target,
-            'message' => 'Created new inventory item from received PO line.'];
+            'qr_code' => $generated_qr,
+            'message' => 'Created new inventory item from received PO line with generated QR code.'];
 }
