@@ -1,6 +1,36 @@
 <?php
 $current_script = $_SERVER['SCRIPT_NAME'] ?? '';
 $asset_prefix = (strpos($current_script, '/pages/') !== false || strpos($current_script, '/actions/') !== false) ? '../' : './';
+
+// Emit a permissive CSP via PHP so it takes precedence over any server-level header.
+// The live server (vle.dcc.edu.ph) sets script-src 'none' at the vhost level;
+// PHP header() replaces that with our policy before output is sent.
+$csp = implode('; ', [
+    "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:"
+        . " https://cdn.jsdelivr.net"
+        . " https://cdnjs.cloudflare.com"
+        . " https://cdn.datatables.net"
+        . " https://code.jquery.com"
+        . " https://vle.dcc.edu.ph",
+    "script-src-elem 'self' 'unsafe-inline'"
+        . " https://cdn.jsdelivr.net"
+        . " https://cdnjs.cloudflare.com"
+        . " https://cdn.datatables.net"
+        . " https://code.jquery.com"
+        . " https://vle.dcc.edu.ph",
+    "style-src 'self' 'unsafe-inline'"
+        . " https://cdn.jsdelivr.net"
+        . " https://cdnjs.cloudflare.com"
+        . " https://cdn.datatables.net"
+        . " https://fonts.googleapis.com",
+    "font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' blob: https:",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'self'",
+]);
+header('Content-Security-Policy: ' . $csp, true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -9,6 +39,8 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false || strpos($current
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= $pageTitle ?? 'DARTS' ?></title>
+  <!-- CSP meta fallback (belt-and-suspenders alongside the PHP header above) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://code.jquery.com https://vle.dcc.edu.ph; script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://code.jquery.com https://vle.dcc.edu.ph; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' blob: https:; worker-src 'self' blob:;">
 
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
