@@ -82,7 +82,7 @@ function stock_qr_png($conn, string $type, int $id): ?string
     }
 }
 
-/** Read the stored qr_code BLOB for one row (null when empty/absent). */
+/** Read the stored qr_code for one row (null when empty/absent). */
 function stock_qr_blob($conn, string $type, int $id): ?string
 {
     $table = stock_qr_table($type);
@@ -92,25 +92,50 @@ function stock_qr_blob($conn, string $type, int $id): ?string
     if (!$stmt) return null;
     $stmt->bind_param('i', $id);
     $stmt->execute();
-    $stmt->bind_result($blob);
+    $stmt->bind_result($val);
     $png = null;
-    if ($stmt->fetch() && $blob !== null && $blob !== '') {
-        $png = $blob;
+    if ($stmt->fetch() && $val !== null && $val !== '') {
+        if (strpos($val, "\x89PNG") === 0) {
+            $png = $val;
+        } else {
+            try {
+                $qr = new QrCode($val, QrCode::ECC_MEDIUM);
+                $png = $qr->toPng(4, 4);
+            } catch (Throwable $e) {
+                $png = null;
+            }
+        }
     }
     $stmt->close();
     return $png;
 }
 
 /**
- * Persist a generated PNG into the row's qr_code BLOB.
- * Uses send_long_data so binary data is written safely; failures are
- * swallowed (the view endpoint simply regenerates next time).
+ * Persist a generated QR into the row's qr_code column.
+ * Handles both BLOB (via send_long_data) and VARCHAR without throwing errors.
  */
 function stock_qr_persist($conn, string $type, int $id, string $png): bool
 {
     $table = stock_qr_table($type);
     if ($table === null || $id <= 0) return false;
     try {
+        // Check column type
+        $colRes = $conn->query("SHOW COLUMNS FROM `$table` LIKE 'qr_code'");
+        if ($colRes && $col = $colRes->fetch_assoc()) {
+            if (stripos($col['Type'], 'varchar') !== false) {
+                // If VARCHAR, store identifier rather than raw binary image
+                $up = $conn->prepare("UPDATE `$table` SET qr_code = COALESCE(NULLIF(qr_code, ''), ?) WHERE inventory_id = ?");
+                if ($up) {
+                    $codeVal = 'INV-' . $id;
+                    $up->bind_param('si', $codeVal, $id);
+                    $ok = $up->execute();
+                    $up->close();
+                    return (bool)$ok;
+                }
+                return true;
+            }
+        }
+
         $up = $conn->prepare("UPDATE `$table` SET qr_code = ? WHERE inventory_id = ?");
         if (!$up) return false;
         $null = null;
