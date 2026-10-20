@@ -456,11 +456,19 @@ include '../includes/header.php';
             if (!cameras || cameras.length === 0) {
                 throw new Error('No camera found on this device.');
             }
-            // Prefer environment (rear) camera, fall back to first available (e.g. webcam)
-            var envCam = cameras.find(function (c) { return c.facing === 'environment'; });
-            var cameraConfig = envCam ? envCam.id : cameras[0].id;
+
             html5QrCode = new Html5Qrcode('scanner-container');
-            return html5QrCode.start(cameraConfig, { fps: 10, qrbox: 260 }, onDecode, onError).then(function () {
+
+            // Use facingMode constraint to force the rear (environment) camera.
+            // This is the most reliable method across Android/iOS mobile browsers.
+            var cameraConstraint = { facingMode: { ideal: 'environment' } };
+
+            return html5QrCode.start(
+                cameraConstraint,
+                { fps: 10, qrbox: { width: 260, height: 260 } },
+                onDecode,
+                onError
+            ).then(function () {
                 var wrap = document.getElementById('scanner-wrap');
                 if (wrap) wrap.classList.add('active');
                 scannerStatus.textContent = '● Camera active. Hold QR code in frame';
