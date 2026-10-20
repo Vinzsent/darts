@@ -6,83 +6,349 @@ include '../includes/header.php';
 ?>
 <?php include '../includes/sidebar.php'; ?>
 <style>
+  /* ─── Desktop layout ─────────────────────────────────────────────── */
   @media (min-width: 992px) {
     .scanner-main-content {
       margin-left: 270px;
       max-width: calc(100% - 290px);
+      padding-top: 1.5rem;
+    }
+  }
+
+  /* ─── Mobile layout ──────────────────────────────────────────────── */
+  @media (max-width: 991.98px) {
+    .scanner-main-content {
+      margin-left: 0 !important;
+      max-width: 100% !important;
+      padding-top: 0 !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    /* Full bleed scanner card on mobile */
+    .scanner-card-wrap {
+      border-radius: 0 !important;
+      border: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Full viewport viewfinder on mobile */
+    .scanner-viewfinder {
+      aspect-ratio: unset !important;
+      height: 60vw !important;
+      min-height: 280px !important;
+      max-height: 380px !important;
+      border-radius: 0 !important;
+      width: 100% !important;
+    }
+
+    .scanner-mobile-header {
+      padding: 0.9rem 1rem 0.9rem 4.2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid #e9ecef;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .scanner-btn-group {
+      flex-direction: column !important;
+      padding: 0 1rem;
+    }
+
+    .scanner-btn-group .btn {
+      width: 100% !important;
+      min-height: 54px !important;
+      font-size: 1.05rem !important;
+      border-radius: 14px !important;
+    }
+
+    .scanner-card-body {
+      padding: 0 !important;
+    }
+
+    .scanner-hint-bar {
+      margin: 0.85rem 1rem 0;
+      border-radius: 12px !important;
+    }
+
+    .scanner-actions-wrap {
+      padding: 1rem 1rem 1.25rem;
+    }
+
+    /* Larger reticle corners on mobile */
+    .scanner-reticle-corner {
+      width: 32px !important;
+      height: 32px !important;
+    }
+  }
+
+  /* ─── Viewfinder ─────────────────────────────────────────────────── */
+  .scanner-viewfinder {
+    aspect-ratio: 4 / 3;
+    background: #06110a;
+    border: none;
+    border-radius: 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 10px 28px rgba(7, 59, 29, 0.2);
+    width: 100%;
+  }
+
+  /* Camera feed fills full container */
+  .scanner-viewfinder #scanner-container,
+  .scanner-viewfinder #scanner-container > * {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  /* ─── Reticle corners ────────────────────────────────────────────── */
+  .scanner-reticle-corner {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: #facc15;
+    border-style: solid;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .reticle-tl { top: 18px; left: 18px; border-width: 3px 0 0 3px; border-top-left-radius: 6px; }
+  .reticle-tr { top: 18px; right: 18px; border-width: 3px 3px 0 0; border-top-right-radius: 6px; }
+  .reticle-bl { bottom: 50px; left: 18px; border-width: 0 0 3px 3px; border-bottom-left-radius: 6px; }
+  .reticle-br { bottom: 50px; right: 18px; border-width: 0 3px 3px 0; border-bottom-right-radius: 6px; }
+
+  /* ─── Laser scan line ────────────────────────────────────────────── */
+  @keyframes scanSweep {
+    0%   { top: 12%; opacity: 0.2; }
+    50%  { opacity: 1; }
+    100% { top: 82%; opacity: 0.2; }
+  }
+
+  .scan-laser-line {
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #22c55e, #facc15, #22c55e, transparent);
+    box-shadow: 0 0 10px #22c55e, 0 0 20px rgba(34,197,94,0.4);
+    z-index: 4;
+    display: none;
+    animation: scanSweep 2s ease-in-out infinite alternate;
+  }
+  .scanner-viewfinder.active .scan-laser-line { display: block; }
+
+  /* ─── Status badge ───────────────────────────────────────────────── */
+  .scanner-status-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #073b1d;
+    font-weight: 700;
+    font-size: 0.78rem;
+    padding: 6px 14px;
+    border-radius: 50px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    max-width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── Hint overlay ───────────────────────────────────────────────── */
+  .scanner-hint-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 65%, transparent 100%);
+    padding: 24px 16px 16px;
+    color: #fff;
+    text-align: center;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  /* ─── Vignette overlay on viewfinder ────────────────────────────── */
+  .scanner-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none;
+  }
+
+  /* ─── Action buttons ─────────────────────────────────────────────── */
+  #btn-start {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    border: none;
+    box-shadow: 0 4px 16px rgba(22,163,74,0.35);
+    transition: transform 0.12s, box-shadow 0.12s;
+  }
+  #btn-start:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(22,163,74,0.25); }
+
+  #btn-sample {
+    border: 2px solid #dee2e6;
+    color: #495057;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  #btn-sample:hover { background: #f8f9fa; border-color: #adb5bd; }
+
+  /* ─── Page header strip ─────────────────────────────────────────── */
+  .scanner-page-header {
+    background: #fff;
+  }
+
+  /* Desktop padding restore for card body and actions */
+  @media (min-width: 992px) {
+    .scanner-card-body { padding: 1.5rem !important; }
+    .scanner-actions-wrap { padding: 0; }
+    .scanner-hint-bar { margin: 0; }
+    .scanner-mobile-header { padding: 1rem 1.5rem 1rem 1.5rem; margin-bottom: 1.5rem; }
+    .scanner-viewfinder {
+      aspect-ratio: 4/3 !important;
+      height: auto !important;
+      border-radius: 16px !important;
+      min-height: unset !important;
+      max-height: unset !important;
     }
   }
 </style>
 
-<main class="container py-4 scanner-main-content">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <h1 class="h4 mb-0"><i class="fas fa-qrcode text-primary mr-2"></i>QR Scanner</h1>
-        <span class="badge bg-secondary">Mobile</span>
+<main class="scanner-main-content">
+    <!-- ── Page Header ── -->
+    <div class="scanner-mobile-header scanner-page-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+            <div class="bg-success text-white rounded-3 p-2 me-2 d-flex align-items-center justify-content-center shadow-sm" style="width:38px;height:38px;flex-shrink:0;">
+                <i class="fas fa-qrcode"></i>
+            </div>
+            <div>
+                <h1 class="h6 mb-0 fw-bold text-dark lh-1">QR Scanner</h1>
+                <small class="text-muted" style="font-size:0.72rem;">Aircon Unit Verification</small>
+            </div>
+        </div>
+        <span class="badge rounded-pill" style="background:rgba(22,163,74,0.12);color:#15803d;font-size:0.72rem;padding:5px 10px;border:1px solid rgba(22,163,74,0.25);">
+            <i class="fas fa-mobile-alt me-1"></i>Mobile
+        </span>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body">
-            <div id="scanner-wrap" class="position-relative" style="aspect-ratio:4/3;background:#0b1214;border:2px solid #dee2e6;border-radius:14px;overflow:hidden;">
-                <div id="scanner-container" class="position-absolute inset-0 w-100 h-100"></div>
-                <div id="scanner-hint" class="position-absolute bottom-0 start-0 end-0 p-3 bg-black/60 text-white text-center" style="border-top:1px solid rgba(255,255,255,.18);">
-                    <small>Tap <strong id="scanner-title">Start Scanner</strong> and hold a printed QR code inside the frame</small>
+    <!-- ── Scanner Card ── -->
+    <div class="card border-0 scanner-card-wrap mb-3" style="border-radius:20px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10);">
+        <div class="scanner-card-body">
+
+            <!-- Viewfinder -->
+            <div id="scanner-wrap" class="scanner-viewfinder">
+                <!-- Camera feed -->
+                <div id="scanner-container" style="position:absolute;inset:0;width:100%;height:100%;"></div>
+
+                <!-- Vignette overlay -->
+                <div class="scanner-vignette"></div>
+
+                <!-- Laser line -->
+                <div class="scan-laser-line" id="scan-laser"></div>
+
+                <!-- Reticle corners -->
+                <div class="scanner-reticle-corner reticle-tl"></div>
+                <div class="scanner-reticle-corner reticle-tr"></div>
+                <div class="scanner-reticle-corner reticle-bl"></div>
+                <div class="scanner-reticle-corner reticle-br"></div>
+
+                <!-- Status badge -->
+                <div id="scanner-status" class="scanner-status-badge">● Ready</div>
+
+                <!-- Hint overlay -->
+                <div id="scanner-hint" class="scanner-hint-overlay">
+                    <div style="font-size:1.4rem;margin-bottom:4px;">📷</div>
+                    <span>Tap <strong id="scanner-title">Start Scanner</strong> and hold a printed QR code inside the frame</span>
                 </div>
-                <div id="scanner-status" class="position-absolute top-3 end-3 px-2 py-1 bg-white text-dark rounded-3 text-small shadow-sm">● Ready</div>
             </div>
-            <div class="d-flex flex-wrap gap-2 mt-3">
-                <button id="btn-start" class="btn btn-lg btn-success px-4"><i class="fas fa-camera mr-2"></i>Start Scanner</button>
-                <button id="btn-sample" class="btn btn-outline-secondary btn-lg"><i class="fas fa-crosshairs mr-2"></i>Use sample</button>
+
+            <!-- Action Buttons -->
+            <div class="scanner-actions-wrap">
+                <div class="d-flex scanner-btn-group gap-2 mb-3">
+                    <button id="btn-start" class="btn btn-lg btn-success flex-grow-1 fw-semibold d-flex align-items-center justify-content-center" style="min-height:52px;border-radius:14px;font-size:1rem;">
+                        <i class="fas fa-camera me-2"></i>Start Scanner
+                    </button>
+                    <button id="btn-sample" class="btn btn-lg btn-outline-secondary d-flex align-items-center justify-content-center" style="min-height:52px;border-radius:14px;font-size:1rem;">
+                        <i class="fas fa-crosshairs me-2"></i>Use sample
+                    </button>
+                </div>
+
+                <!-- Hint bar -->
+                <div class="scanner-hint-bar d-flex align-items-start gap-2 p-3 rounded-3" style="background:linear-gradient(135deg,#f0fdf4,#f8fff9);border:1px solid #bbf7d0;">
+                    <i class="fas fa-circle-info mt-1" style="color:#16a34a;font-size:1rem;flex-shrink:0;"></i>
+                    <div style="font-size:0.82rem;color:#374151;line-height:1.5;">
+                        For best results on phones, <strong>rotate the device horizontally</strong> and ensure the QR code is well lit.
+                    </div>
+                </div>
             </div>
-            <p class="text-muted small mt-2"><i class="fas fa-mobile-alt mr-1"></i>For best results on phones, rotate the device horizontally and ensure the QR code is well lit.</p>
+        </div>
+    </div>
+
+    <!-- View QR details panel (placed INSIDE main container for responsive width) -->
+    <div id="detail-view" class="card shadow-sm border-0 rounded-4 mb-4 d-none">
+        <div class="card-body p-3 p-sm-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 mb-3 border-bottom gap-2">
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-primary-subtle text-primary p-2 rounded-3 me-2">
+                        <i class="fas fa-check-circle"></i>
+                    </span>
+                    <h5 class="mb-0 fw-bold">Scanned Unit</h5>
+                </div>
+                <div class="d-flex flex-wrap gap-2 w-100 w-sm-auto justify-content-end">
+                    <button id="btn-rescan" class="btn btn-sm btn-outline-primary flex-grow-1 flex-sm-grow-0 py-2 px-3 rounded-3">
+                        <i class="fas fa-redo me-1"></i>Scan again
+                    </button>
+                    <button id="btn-close" class="btn btn-sm btn-outline-secondary py-2 px-3 rounded-3">
+                        Close
+                    </button>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-4 text-center">
+                    <div class="card border bg-light rounded-3 p-3">
+                        <div id="qr-wrap" class="mx-auto" style="max-width:200px;">
+                            <img id="qr-image" src="" alt="QR code" class="d-none img-fluid rounded-3 shadow-sm">
+                            <div id="qr-spinner" class="spinner-border text-primary d-none my-4" role="status"><span class="visually-hidden">Loading QR…</span></div>
+                            <div id="qr-empty" class="text-muted small py-4">No QR code stored.</div>
+                        </div>
+                        <div id="qr-title" class="small fw-bold text-success mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-8">
+                    <div class="card border rounded-3">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                                <i class="fas fa-info-circle text-primary me-2"></i>Unit Details
+                            </h6>
+                            <div id="detail-grid" class="row g-2"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="card border rounded-3">
+                        <div class="card-body p-3">
+                            <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                                <i class="fas fa-images text-primary me-2"></i>Unit Pictures
+                            </h6>
+                            <div id="scan-gallery" class="row g-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </main>
-
-<!-- View QR details panel (shown after a successful scan) -->
-<div id="detail-view" class="card shadow-sm border-0 d-none">
-    <div class="card-body">
-        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
-            <h5 class="mb-0"><i class="fas fa-search text-primary mr-2"></i>Scanned Unit</h5>
-            <div class="d-flex flex-wrap gap-2">
-                <button id="btn-rescan" class="btn btn-sm btn-outline-primary"><i class="fas fa-redo mr-1"></i>Scan again</button>
-                <button id="btn-close" class="btn btn-sm btn-outline-secondary">Close</button>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-12 mb-3">
-                <div class="card border-0 bg-white rounded-3 overflow-hidden">
-                    <div class="card-body p-3 text-center">
-                        <div id="qr-wrap" class="mx-auto" style="max-width:220px;">
-                            <img id="qr-image" src="" alt="QR code" class="d-none" style="max-width:100%;height:auto;border-radius:10px;">
-                            <div id="qr-spinner" class="spinner-border text-primary d-none" role="status"><span class="visually-hidden">Loading QR…</span></div>
-                            <div id="qr-empty" class="text-muted small">No QR code stored for this unit.</div>
-                        </div>
-                        <div id="qr-title" class="small text-muted mt-2"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="card border-0 bg-white rounded-3">
-                    <div class="card-body">
-                        <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-id-card text-primary me-2"></i>Unit Details</h6>
-                        <div id="detail-grid" class="row g-3"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="card border-0 bg-white rounded-3">
-                    <div class="card-body">
-                        <h6 class="border-bottom pb-2 mb-3"><i class="fas fa-images text-primary me-2"></i>Pictures</h6>
-                        <div id="scan-gallery" class="row g-2"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script src="../assets/js/html5-qrcode.min.js"></script>
 <style>
@@ -183,8 +449,8 @@ include '../includes/header.php';
             return;
         }
 
-        scannerStatus.textContent = '● Requesting camera access�';
-        scannerTitle.textContent = 'Scanning�';
+        scannerStatus.textContent = '● Requesting camera access...';
+        scannerTitle.textContent = 'Scanning...';
 
         Html5Qrcode.getCameras().then(function (cameras) {
             if (!cameras || cameras.length === 0) {
@@ -194,8 +460,18 @@ include '../includes/header.php';
             var envCam = cameras.find(function (c) { return c.facing === 'environment'; });
             var cameraConfig = envCam ? envCam.id : cameras[0].id;
             html5QrCode = new Html5Qrcode('scanner-container');
-            return html5QrCode.start(cameraConfig, { fps: 10, qrbox: 260 }, onDecode, onError);
+            return html5QrCode.start(cameraConfig, { fps: 10, qrbox: 260 }, onDecode, onError).then(function () {
+                var wrap = document.getElementById('scanner-wrap');
+                if (wrap) wrap.classList.add('active');
+                scannerStatus.textContent = '● Camera active. Hold QR code in frame';
+                scannerTitle.textContent = 'Scanning…';
+                btnStart.textContent = 'Stop Scanner';
+                btnStart.classList.remove('btn-success', 'btn-danger');
+                btnStart.classList.add('btn-warning');
+            });
         }).catch(function (err) {
+            var wrap = document.getElementById('scanner-wrap');
+            if (wrap) wrap.classList.remove('active');
             var msg = err && err.message ? err.message : 'Camera unavailable';
             if (msg.indexOf('environment') !== -1 || msg.indexOf('facing') !== -1 ||
                 msg.indexOf('constraint') !== -1) {
@@ -203,11 +479,13 @@ include '../includes/header.php';
             }
             scannerStatus.textContent = '● ' + msg;
             btnStart.textContent = 'Restart Scanner';
-            btnStart.classList.remove('btn-success');
+            btnStart.classList.remove('btn-success', 'btn-warning');
             btnStart.classList.add('btn-danger');
         });
     }
     function stopScanner() {
+        var wrap = document.getElementById('scanner-wrap');
+        if (wrap) wrap.classList.remove('active');
         if (!html5QrCode) return;
         html5QrCode.stop().then(function () {
             html5QrCode.destroy();
@@ -215,14 +493,16 @@ include '../includes/header.php';
             scannerStatus.textContent = '● Ready';
             scannerTitle.textContent = 'Start Scanner';
             btnStart.textContent = 'Start Scanner';
-            btnStart.classList.remove('btn-danger');
+            btnStart.classList.remove('btn-danger', 'btn-warning');
             btnStart.classList.add('btn-success');
         }).catch(function () { /* ignore */ });
     }
 
     function onDecode(decodedText) {
         if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
-        scannerStatus.textContent = '● Scanning…';
+        var wrap = document.getElementById('scanner-wrap');
+        if (wrap) wrap.classList.remove('active');
+        scannerStatus.textContent = '● QR Code detected! Loading…';
 
         try {
             var data = JSON.parse(decodedText);
@@ -239,8 +519,20 @@ include '../includes/header.php';
 
     function onError(err) {
         if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+        // Html5Qrcode triggers this callback on every video frame (10 times/second) when no QR code is in view.
+        // Ignore normal scan detection misses and keep status clean.
+        var str = String(err || '');
+        if (str.indexOf('No MultiFormat Readers') !== -1 ||
+            str.indexOf('NotFoundException') !== -1 ||
+            str.indexOf('No barcode or QR code detected') !== -1 ||
+            str.indexOf('parse error') !== -1) {
+            if (scannerStatus.textContent !== '● Camera active. Hold QR code in frame') {
+                scannerStatus.textContent = '● Camera active. Hold QR code in frame';
+            }
+            return;
+        }
         if (err && err.message && err.message.indexOf('Callback invocation failed') !== -1) return;
-        scannerStatus.textContent = '● ' + String(err);
+        scannerStatus.textContent = '● ' + str;
     }
 
     function loadUnit(id) {
