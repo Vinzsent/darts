@@ -459,16 +459,60 @@ include '../includes/header.php';
 
             html5QrCode = new Html5Qrcode('scanner-container');
 
-            // Use facingMode constraint to force the rear (environment) camera.
-            // This is the most reliable method across Android/iOS mobile browsers.
-            var cameraConstraint = { facingMode: { ideal: 'environment' } };
+            // Force the rear (back) camera on mobile phones.
+            // 1) Prefer a device whose label looks like back/rear/environment.
+            // 2) Otherwise fall back to the last enumerated camera (rear on most phones).
+            var rearCameraId = null;
+            if (cameras && cameras.length) {
+                var i, label;
+                for (i = 0; i < cameras.length; i++) {
+                    label = (cameras[i].label || '').toLowerCase();
+                    if (label.indexOf('back') !== -1 || label.indexOf('rear') !== -1 || label.indexOf('environment') !== -1) {
+                        rearCameraId = cameras[i].id;
+                        break;
+                    }
+                }
+                if (!rearCameraId) {
+                    rearCameraId = cameras[cameras.length - 1].id;
+                }
+            }
 
-            return html5QrCode.start(
-                cameraConstraint,
-                { fps: 10, qrbox: { width: 260, height: 260 } },
-                onDecode,
-                onError
-            ).then(function () {
+            var scanConfig = { fps: 10, qrbox: { width: 260, height: 260 } };
+
+            // exact:"environment" is a hard requirement (not a preference like
+            // ideal), so the browser cannot silently substitute the front camera.
+            function startWithEnvironment() {
+                return html5QrCode.start(
+                    { facingMode: { exact: 'environment' } },
+                    scanConfig,
+                    onDecode,
+                    onError
+                );
+            }
+
+            function startWithRearId() {
+                if (!rearCameraId) { throw new Error('No rear camera found. Grant camera access and retry.'); }
+                return html5QrCode.start(
+                    rearCameraId,
+                    scanConfig,
+                    onDecode,
+                    onError
+                );
+            }
+
+            // Try exact rear camera first; if the device rejects the exact
+            // constraint, fall back to the enumerated rear device id.
+            var started;
+            try {
+                started = startWithEnvironment();
+            } catch (e) {
+                started = startWithRearId();
+            }
+            if (started && typeof started.catch === 'function') {
+                started = started.catch(function () { return startWithRearId(); });
+            }
+
+            return started.then(function () {
                 var wrap = document.getElementById('scanner-wrap');
                 if (wrap) wrap.classList.add('active');
                 scannerStatus.textContent = '● Camera active. Hold QR code in frame';
