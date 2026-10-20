@@ -286,6 +286,7 @@
 
     // Load Unit Details from Server
     function loadUnit(query) {
+        clearDebugError();
         var url = '../actions/view_aircon_details.php?query=' + encodeURIComponent(query);
 
         fetch(url, { credentials: 'same-origin' })
@@ -304,7 +305,6 @@
             })
             .catch(function (err) {
                 setStatus('● Not found', 'bg-danger-subtle text-danger border border-danger-subtle');
-                showDebugError('Item Lookup ("' + query + '")', err);
                 alert(err && err.message ? err.message : 'Item not found in any inventory.');
             });
     }
