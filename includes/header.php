@@ -72,71 +72,130 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false || strpos($current
       position: fixed;
       top: 0.75rem;
       left: 0.75rem;
-      z-index: 1050;
-      width: 2.6rem;
-      height: 2.6rem;
+      z-index: 1030;
+      width: 2.75rem;
+      height: 2.75rem;
       border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 0.5rem;
+      border-radius: 0.6rem;
       background: #073b1d;
       color: #ffffff;
-      font-size: 1.1rem;
+      font-size: 1.15rem;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .mobile-sidebar-toggle:hover,
+    .mobile-sidebar-toggle:focus {
+      background: #0a4f27;
+      color: #ffffff;
+      outline: none;
+    }
+
+    /* Fixed full-screen backdrop behind drawer */
+    .mobile-sidebar-backdrop {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1040;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .mobile-sidebar-backdrop.show {
+      opacity: 1;
+      visibility: visible;
     }
 
     .mobile-sidebar-drawer {
       position: fixed;
       top: 0;
       left: 0;
-      height: 100%;
-      width: 260px;
-      z-index: 1040;
-      display: none;
+      bottom: 0;
+      height: 100vh;
+      height: 100dvh;
+      width: 280px;
+      max-width: 85vw;
+      z-index: 1050;
+      display: flex;
       flex-direction: column;
       transform: translateX(-100%);
-      transition: transform 0.3s ease;
+      visibility: hidden;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.3s ease;
       background: #073b1d;
+      box-shadow: 6px 0 25px rgba(0, 0, 0, 0.45);
     }
 
     .mobile-sidebar-drawer.open {
       transform: translateX(0);
-    }
-
-    .mobile-sidebar-backdrop {
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.55);
-      backdrop-filter: blur(4px);
+      visibility: visible;
     }
 
     .mobile-sidebar-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.75rem 1rem;
+      padding: 1rem 1.25rem;
       border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-      background: #073b1d;
+      background: #052c16;
     }
 
     .mobile-sidebar-title {
       color: #ffffff;
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: 1.2rem;
+      letter-spacing: 0.05em;
     }
 
     .mobile-sidebar-close {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.1);
       border: 0;
       color: #ffffff;
-      font-size: 1.25rem;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
       cursor: pointer;
-      padding: 0.25rem;
+      transition: background 0.2s ease;
+    }
+
+    .mobile-sidebar-close:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .mobile-sidebar-body {
       flex: 1 1 auto;
       overflow-y: auto;
-      padding: 1rem;
+      padding: 0.75rem;
+    }
+
+    /* Links inside mobile drawer - high contrast readable white */
+    .mobile-sidebar-drawer a {
+      color: rgba(255, 255, 255, 0.85) !important;
+      text-decoration: none !important;
+    }
+
+    .mobile-sidebar-drawer a:hover,
+    .mobile-sidebar-drawer a:focus {
+      color: #ffffff !important;
+      background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .mobile-sidebar-drawer a.bg-yellow-400 {
+      color: #073b1d !important;
+      background-color: #facc15 !important;
+      font-weight: 600 !important;
     }
 
     @media (max-width: 991.98px) {
@@ -144,9 +203,6 @@ $asset_prefix = (strpos($current_script, '/pages/') !== false || strpos($current
         display: none !important;
       }
       .mobile-sidebar-toggle {
-        display: flex !important;
-      }
-      .mobile-sidebar-drawer {
         display: flex !important;
       }
     }
