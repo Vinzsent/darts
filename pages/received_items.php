@@ -89,8 +89,8 @@ $query = "
     END, p.created_at DESC
 ";
 
-// ── Pagination: 20 purchase orders per page via ?page=N ──
-$per_page = 5;
+// ── Pagination: 15 purchase orders per page via ?page=N (rules.md: 10-20 per page) ──
+$per_page = 15;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) {
     $page = 1;
