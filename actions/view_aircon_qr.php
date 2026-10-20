@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Stream one AIRCON unit's QR code as a PNG image.
  *
@@ -9,7 +10,7 @@
  *     of the unit's identity + key specs, and persists it for next time.
  */
 session_start();
-include '../includes/db.php';
+require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/qrcode.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -52,38 +53,37 @@ function buildAirconQrPng($conn, $id)
         'life'   => (string)($row['lifespan'] ?? ''),
     ];
     $qr = new QrCode(json_encode($payload, JSON_UNESCAPED_UNICODE), QrCode::ECC_MEDIUM);
-    return $qr->toPng(4, 4);
+    return $qr->toPng(6, 4);
 }
 
-// Try the stored BLOB first (unless a regen was requested).
+// Try the stored value first (unless a regen was requested).
 $png = null;
 if (!$regen) {
     $stmt = $conn->prepare("SELECT qr_code FROM aircons WHERE aircon_id = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param('i', $id);
         $stmt->execute();
-        $stmt->bind_result($blob);
-        if ($stmt->fetch() && $blob !== null && $blob !== '') {
-            $png = $blob;
+        $stmt->bind_result($val);
+        if ($stmt->fetch() && $val !== null && $val !== '') {
+            if (strpos($val, "\x89PNG") === 0) {
+                $png = $val;
+            } else {
+                try {
+                    $qr = new QrCode($val, QrCode::ECC_MEDIUM);
+                    $png = $qr->toPng(6, 4);
+                } catch (Throwable $e) {
+                    $png = null;
+                }
+            }
         }
         $stmt->close();
     }
 }
 
-// Fall back to generating on the fly (and persist it for next time).
+// Fall back to generating on the fly.
 if ($png === null) {
     try {
         $png = buildAirconQrPng($conn, $id);
-        if ($png !== null) {
-            $up = $conn->prepare("UPDATE aircons SET qr_code = ? WHERE aircon_id = ?");
-            if ($up) {
-                $null = null;
-                $up->bind_param('bi', $null, $id);
-                $up->send_long_data(0, $png);
-                $up->execute();
-                $up->close();
-            }
-        }
     } catch (Throwable $e) {
         $png = null;
     }
