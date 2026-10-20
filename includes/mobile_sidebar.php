@@ -33,6 +33,9 @@ if (file_exists(__DIR__ . '/../sidebar/' . $sidebar_file)) {
     if (preg_match('#<div class="sidebar[^"]*"[^>]*>(.*)</div>#is', $sidebar_html, $m)) {
         $sidebar_html = $m[1];
     }
+
+    // Remove duplicate desktop header section to keep mobile drawer clean
+    $sidebar_html = preg_replace('#<!-- Sidebar Header -->.*?</div>\s*</div>\s*</div>#is', '', $sidebar_html);
 }
 ?>
 
@@ -41,9 +44,11 @@ if (file_exists(__DIR__ . '/../sidebar/' . $sidebar_file)) {
   <i class="fas fa-bars"></i>
 </button>
 
+<!-- Mobile off-canvas backdrop (covers full screen behind drawer) -->
+<div class="mobile-sidebar-backdrop d-lg-none" id="mobileSidebarBackdrop"></div>
+
 <!-- Mobile off-canvas drawer -->
 <div class="mobile-sidebar-drawer d-lg-none" id="mobileSidebar" role="dialog" aria-label="Sidebar navigation">
-  <div class="mobile-sidebar-backdrop" id="mobileSidebarBackdrop"></div>
   <div class="mobile-sidebar-header">
     <span class="mobile-sidebar-title">DARTS</span>
     <button type="button" class="mobile-sidebar-close" id="mobileSidebarClose" aria-label="Close menu">
@@ -64,12 +69,14 @@ if (file_exists(__DIR__ . '/../sidebar/' . $sidebar_file)) {
 
   function open() {
     if (drawer) { drawer.classList.add('open'); }
+    if (backdrop) { backdrop.classList.add('show'); }
     if (toggle) { toggle.setAttribute('aria-expanded', 'true'); }
     document.body.style.overflow = 'hidden';
   }
 
   function closeDrawer() {
     if (drawer) { drawer.classList.remove('open'); }
+    if (backdrop) { backdrop.classList.remove('show'); }
     if (toggle) { toggle.setAttribute('aria-expanded', 'false'); }
     document.body.style.overflow = '';
   }
