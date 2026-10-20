@@ -61,9 +61,9 @@ $created_by_expr = "COALESCE($user_name_expr, u.username, 'Unknown')";
 $search_term = trim($_GET['search'] ?? '');
 $status_filter = trim($_GET['status'] ?? '');
 
-// Server-side pagination: 20 purchase orders per page via ?page=N.
+// Server-side pagination: 15 purchase orders per page via ?page=N (rules.md: 10-20 per page).
 // The search form only submits `search` and `status`, so a new search always lands on page 1.
-$per_page = 5;
+$per_page = 15;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
 if ($page < 1) {
     $page = 1;
