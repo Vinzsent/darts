@@ -273,6 +273,18 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
         $suppliers_array[] = $supplier;
     }
 }
+
+// Fetch active offices for dynamic dropdown
+$offices_query = $conn->query("SELECT id, office_name FROM offices WHERE status = 'Active' OR status IS NULL ORDER BY office_name ASC");
+$offices_array = [];
+if ($offices_query && $offices_query->num_rows > 0) {
+    while ($office_row = $offices_query->fetch_assoc()) {
+        $offices_array[] = [
+            'id' => (int)$office_row['id'],
+            'office_name' => (string)$office_row['office_name']
+        ];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -867,16 +879,17 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                         <thead>
                             <tr>
                                 <th style="width: 8%;">NO</th>
-                                <th style="width: 40%;">ITEM DESCRIPTION</th>
-                                <th style="width: 15%;">QUANTITY</th>
-                                <th style="width: 17%;">UNIT COST</th>
-                                <th style="width: 20%;">AMOUNT</th>
+                                <th style="width: 35%;">ITEM DESCRIPTION</th>
+                                <th style="width: 12%;">OFFICE</th>
+                                <th style="width: 13%;">QUANTITY</th>
+                                <th style="width: 16%;">UNIT COST</th>
+                                <th style="width: 16%;">AMOUNT</th>
                             </tr>
                         </thead>
                         <tbody id="itemsTableBody">
                             <!-- Dynamic rows will be added here -->
                             <tr id="totalAmountRow" class="total-row" style="background-color: var(--primary-green); color: #ffffff !important; font-weight: bold;">
-                                <td colspan="4" style="text-align: right; padding-right: 20px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">TOTAL AMOUNT:</td>
+                                <td colspan="5" style="text-align: right; padding-right: 20px; color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">TOTAL AMOUNT:</td>
                                 <td id="totalAmount" style="color: #ffffff !important; -webkit-text-fill-color: #ffffff !important;">₱0.00</td>
                             </tr>
                         </tbody>
@@ -944,12 +957,12 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                 // Calculate row total when quantity or unit cost changes
                 function calculateRowTotal(input) {
                     const row = input.closest('tr');
-                    const rawQty = row.cells[2].querySelector('input')?.value || '0';
+                    const rawQty = row.cells[3].querySelector('input')?.value || '0';
                     const quantity = parseFloat(rawQty) || 0;
-                    const unitCost = parseFloat(row.cells[3].querySelector('input')?.value) || 0;
+                    const unitCost = parseFloat(row.cells[4].querySelector('input')?.value) || 0;
                     const amount = quantity * unitCost;
 
-                    row.cells[4].textContent = '₱' + amount.toFixed(2);
+                    row.cells[5].textContent = '₱' + amount.toFixed(2);
 
                     calculateGrandTotal();
                 }
@@ -960,7 +973,8 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     let total = 0;
 
                     rows.forEach(row => {
-                        const amountText = row.cells[4]?.textContent.replace('₱', '').replace(',', '') || '0';
+                        const amountCell = row.cells[5] || row.querySelector('.amount-cell');
+                        const amountText = amountCell?.textContent.replace('₱', '').replace(',', '') || '0';
                         const amount = parseFloat(amountText) || 0;
                         total += amount;
                     });
@@ -991,6 +1005,10 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                         inputs.forEach(input => input.value = '');
 
                         const amountCells = document.querySelectorAll('.amount-cell');
+
+                        // Clear office selects
+                        const officeSelects = document.querySelectorAll('.office-select');
+                        officeSelects.forEach(select => select.value = '');
                         amountCells.forEach(cell => cell.textContent = '₱0.00');
 
                         document.getElementById('totalAmount').textContent = '₱0.00';
@@ -1035,13 +1053,15 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     rows.forEach(row => {
                         const descInput = row.cells[1].querySelector('input') || row.cells[1].querySelector('select');
                         const desc = descInput ? descInput.value.trim() : '';
-                        const qty = row.cells[2].querySelector('input')?.value.trim() || '';
-                        const cost = row.cells[3].querySelector('input')?.value.trim() || '';
-                        const amt = row.cells[4]?.textContent.replace('₱', '').trim() || '';
+                        const office = row.cells[2].querySelector('select')?.value || '';
+                        const qty = row.cells[3].querySelector('input')?.value.trim() || '';
+                        const cost = row.cells[4].querySelector('input')?.value.trim() || '';
+                        const amt = row.cells[5]?.textContent.replace('₱', '').trim() || '';
 
                         if (desc || qty || cost || (amt && amt !== '0.00')) {
                             items.push({
                                 desc: desc,
+                                office: office,
                                 qty: qty,
                                 cost: cost ? parseFloat(cost).toLocaleString('en-US', {
                                     minimumFractionDigits: 2,
@@ -1139,14 +1159,17 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     rows.forEach((row, index) => {
                         const descriptionElement = row.cells[1].querySelector('select') || row.cells[1].querySelector('input');
                         const description = descriptionElement ? descriptionElement.value.trim() : '';
-                        const rawQuantity = row.cells[2].querySelector('input')?.value.trim() || '';
-                        const unit_cost = parseFloat(row.cells[3].querySelector('input')?.value) || 0;
+                        const officeSelect = row.cells[2].querySelector('select');
+                        const office = officeSelect ? officeSelect.value : '';
+                        const rawQuantity = row.cells[3].querySelector('input')?.value.trim() || '';
+                        const unit_cost = parseFloat(row.cells[4].querySelector('input')?.value) || 0;
 
                         if (description && (rawQuantity !== '' || unit_cost > 0)) {
                             items.push({
                                 description: description,
                                 quantity: rawQuantity,
                                 location: '',
+                                office: office,
                                 unit_cost: unit_cost
                             });
                         }
@@ -1255,9 +1278,10 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                                 const rows = document.querySelectorAll('#itemsTable tbody tr:not(:last-child)');
                                 rows.forEach(row => {
                                     row.cells[1].querySelector('input').value = '';
-                                    row.cells[2].querySelector('input').value = '';
+                                    if (row.cells[2].querySelector('select')) row.cells[2].querySelector('select').value = '';
                                     row.cells[3].querySelector('input').value = '';
-                                    row.cells[4].textContent = '₱0.00';
+                                    row.cells[4].querySelector('input').value = '';
+                                    row.cells[5].textContent = '₱0.00';
                                 });
 
                                 // Fill items
@@ -1265,9 +1289,13 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                                     if (index < rows.length) {
                                         const row = rows[index];
                                         row.cells[1].querySelector('input').value = item.item_description;
-                                        row.cells[2].querySelector('input').value = item.quantity;
-                                        row.cells[3].querySelector('input').value = item.unit_cost;
-                                        row.cells[4].textContent = '₱' + item.line_total.toFixed(2);
+                                        const officeSelect = row.cells[2].querySelector('select');
+                                        if (officeSelect) {
+                                            officeSelect.value = item.office || '';
+                                        }
+                                        row.cells[3].querySelector('input').value = item.quantity;
+                                        row.cells[4].querySelector('input').value = item.unit_cost;
+                                        row.cells[5].textContent = '₱' + item.line_total.toFixed(2);
                                     }
                                 });
 
@@ -1282,9 +1310,157 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                         });
                 }
 
-                // Load canvass items for dropdown
+                // Load canvass items, suppliers, and offices for dropdown
                 let canvassItems = [];
                 let suppliers = [];
+                let officesList = <?= json_encode($offices_array) ?>;
+
+                function loadOfficesList() {
+                    return fetch('../api/get_offices.php')
+                        .then(response => {
+                            if (!response.ok) throw new Error('HTTP ' + response.status);
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.success && Array.isArray(data.offices)) {
+                                officesList = data.offices;
+                                updateAllOfficeSelects();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error loading offices:', error.message);
+                        });
+                }
+
+                function buildOfficeOptionsHtml(selectedVal = '') {
+                    let html = `<option value="">Select Office</option>`;
+                    html += `<option value="__add_new__" style="color: #073b1d; font-weight: bold; background: #fef08a;">+ Add new office...</option>`;
+
+                    let hasSelected = false;
+                    officesList.forEach(off => {
+                        const name = off.office_name || '';
+                        const isSel = (name === selectedVal);
+                        if (isSel) hasSelected = true;
+                        html += `<option value="${escapeHtml(name)}"${isSel ? ' selected' : ''}>${escapeHtml(name)}</option>`;
+                    });
+
+                    if (selectedVal && !hasSelected && selectedVal !== '__add_new__') {
+                        html += `<option value="${escapeHtml(selectedVal)}" selected>${escapeHtml(selectedVal)}</option>`;
+                    }
+
+                    return html;
+                }
+
+                let activeOfficeSelect = null;
+
+                function onOfficeSelectChange(selectEl) {
+                    if (selectEl.value === '__add_new__') {
+                        selectEl.value = selectEl.dataset.prevValue || '';
+                        openAddOfficeModalFromPO(selectEl);
+                    } else {
+                        selectEl.dataset.prevValue = selectEl.value;
+                    }
+                }
+
+                function openAddOfficeModalFromPO(selectEl) {
+                    activeOfficeSelect = selectEl;
+                    const input = document.getElementById('poNewOfficeName');
+                    if (input) input.value = '';
+                    const alertBox = document.getElementById('poOfficeModalAlert');
+                    if (alertBox) {
+                        alertBox.textContent = '';
+                        alertBox.classList.add('d-none');
+                    }
+                    const modal = document.getElementById('poAddOfficeModal');
+                    if (modal) {
+                        modal.style.display = 'block';
+                        setTimeout(() => input?.focus(), 100);
+                    }
+                }
+
+                function closeAddOfficeModalFromPO() {
+                    const modal = document.getElementById('poAddOfficeModal');
+                    if (modal) modal.style.display = 'none';
+                    activeOfficeSelect = null;
+                }
+
+                function saveNewOfficeFromPO(e) {
+                    if (e) e.preventDefault();
+                    const input = document.getElementById('poNewOfficeName');
+                    const alertBox = document.getElementById('poOfficeModalAlert');
+                    const submitBtn = document.getElementById('btnSaveOfficeFromPO');
+                    const officeName = input ? input.value.trim() : '';
+
+                    if (!officeName) {
+                        if (alertBox) {
+                            alertBox.textContent = 'Please enter an Office Name.';
+                            alertBox.classList.remove('d-none');
+                        }
+                        return;
+                    }
+
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+                    }
+
+                    fetch('../actions/add_office.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({ office_name: officeName })
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.office) {
+                            const newOffice = data.office;
+                            if (!officesList.some(o => o.office_name.toLowerCase() === newOffice.office_name.toLowerCase())) {
+                                officesList.push(newOffice);
+                                officesList.sort((a, b) => a.office_name.localeCompare(b.office_name));
+                            }
+
+                            updateAllOfficeSelects();
+
+                            if (activeOfficeSelect) {
+                                activeOfficeSelect.value = newOffice.office_name;
+                                activeOfficeSelect.dataset.prevValue = newOffice.office_name;
+                            }
+
+                            closeAddOfficeModalFromPO();
+                        } else {
+                            if (alertBox) {
+                                alertBox.textContent = data.message || 'Failed to add office.';
+                                alertBox.classList.remove('d-none');
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error saving office:', err);
+                        if (alertBox) {
+                            alertBox.textContent = 'Server error saving office.';
+                            alertBox.classList.remove('d-none');
+                        }
+                    })
+                    .finally(() => {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = '<i class="fas fa-plus me-1"></i>Add';
+                        }
+                    });
+                }
+
+                function updateAllOfficeSelects() {
+                    const selects = document.querySelectorAll('#itemsTable .office-select');
+                    selects.forEach(sel => {
+                        const currentVal = sel.value || sel.dataset.prevValue || '';
+                        sel.innerHTML = buildOfficeOptionsHtml(currentVal);
+                        sel.value = currentVal;
+                        sel.dataset.prevValue = currentVal;
+                    });
+                }
 
                 function loadSuppliers() {
                     fetch('../api/get_suppliers.php')
@@ -1364,6 +1540,11 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                 <input type="text" class="form-control form-control-sm" list="${listId}"
                     placeholder="Type or choose from canvass list"
                     oninput="onItemSelect(this)" onchange="onItemSelect(this)">
+            </td>
+            <td>
+                <select class="form-control form-control-sm office-select" onchange="onOfficeSelectChange(this)" style="width: 100%; border: none; background: transparent; color: var(--text-dark);">
+                    ${buildOfficeOptionsHtml('')}
+                </select>
             </td>
             <td><input type="text" placeholder="0" oninput="calculateRowTotal(this)"></td>
             <td><input type="number" placeholder="0.00" oninput="calculateRowTotal(this)" min="0" step="0.01"></td>
@@ -1447,7 +1628,7 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                 }
 
                 // Add row with existing data for edit mode
-                function addPORowWithData(itemNumber, description, quantity, unitCost) {
+                function addPORowWithData(itemNumber, description, quantity, unitCost, office = '') {
                     const tbody = document.getElementById('itemsTableBody');
                     const totalRow = tbody.lastElementChild;
                     const listId = 'canvass-list-' + (++datalistCounter);
@@ -1469,6 +1650,11 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     placeholder="Type or choose from canvass list"
                     oninput="onItemSelect(this)" onchange="onItemSelect(this)">
             </td>
+            <td>
+                <select class="form-control form-control-sm office-select" onchange="onOfficeSelectChange(this)" style="width: 100%; border: none; background: transparent; color: var(--text-dark);">
+                    ${buildOfficeOptionsHtml(office)}
+                </select>
+            </td>
             <td><input type="text" placeholder="0" oninput="calculateRowTotal(this)"></td>
             <td><input type="number" placeholder="0.00" oninput="calculateRowTotal(this)" min="0" step="0.01"></td>
             <td class="amount-cell">₱0.00</td>
@@ -1479,16 +1665,20 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
 
                     // Populate the description input and qty/cost
                     newRow.cells[1].querySelector('input[type="text"]').value = description;
-                    const quantityInput = newRow.cells[2].querySelector('input');
-                    const unitCostInput = newRow.cells[3].querySelector('input');
+                    const officeSelect = newRow.cells[2].querySelector('select');
+                    const quantityInput = newRow.cells[3].querySelector('input');
+                    const unitCostInput = newRow.cells[4].querySelector('input');
 
                     quantityInput.value = quantity;
                     unitCostInput.value = unitCost;
+                    if (office && officeSelect) {
+                        officeSelect.value = office;
+                    }
 
                     // Calculate and display total
                     const numQty = parseFloat(quantity) || 0;
                     const lineTotal = numQty * unitCost;
-                    newRow.cells[4].textContent = '₱' + lineTotal.toFixed(2);
+                    newRow.cells[5].textContent = '₱' + lineTotal.toFixed(2);
 
                     // Recalculate grand total
                     calculateGrandTotal();
@@ -1521,9 +1711,10 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
 
                 // Initialize with one empty row or load existing data
                 document.addEventListener('DOMContentLoaded', function() {
-                    // Load suppliers and canvass items first
+                    // Load suppliers, canvass items, and offices first
                     loadSuppliers();
                     loadCanvassItems();
+                    loadOfficesList();
 
                     <?php if ($edit_mode && !empty($po_items)): ?>
                         // Wait for canvass items to load before adding existing PO items
@@ -1575,8 +1766,8 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
 
                     if (item) {
                         // Fill quantity and unit cost
-                        row.cells[2].querySelector('input').value = item.quantity;
-                        row.cells[3].querySelector('input').value = item.unit_cost;
+                        row.cells[3].querySelector('input').value = item.quantity;
+                        row.cells[4].querySelector('input').value = item.unit_cost;
 
                         // Always update supplier (TO:) and Address based on selected item
                         const supplierNameInput = document.getElementById('supplierNameInput');
@@ -1602,8 +1793,8 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                         }
                     } else if (description === '') {
                         // Clear row data if empty selection
-                        row.cells[2].querySelector('input').value = '';
                         row.cells[3].querySelector('input').value = '';
+                        row.cells[4].querySelector('input').value = '';
                     }
 
                     calculateRowTotal(select);
@@ -2179,6 +2370,32 @@ if ($suppliers_result && $suppliers_result->num_rows > 0) {
                     }
                 }
             </style>
+
+            <!-- Modal: Add New Office from Purchase Order -->
+            <div id="poAddOfficeModal" style="display:none; position:fixed; z-index:2050; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); overflow:auto;">
+                <div style="background:#ffffff; margin:10% auto; padding:24px; border-radius:12px; max-width:440px; box-shadow:0 15px 35px rgba(0,0,0,0.25);">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0 fw-bold text-dark d-flex align-items-center" style="font-size: 1.1rem;">
+                            <i class="fas fa-building me-2 text-success"></i>Add New Office
+                        </h5>
+                        <button type="button" class="btn-close" onclick="closeAddOfficeModalFromPO()"></button>
+                    </div>
+                    <form id="poQuickAddOfficeForm" onsubmit="saveNewOfficeFromPO(event)">
+                        <div class="mb-3">
+                            <label for="poNewOfficeName" class="form-label fw-semibold text-dark">Office Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="poNewOfficeName" placeholder="Enter Office Name" required autocomplete="off">
+                            <div class="form-text text-muted">This will be stored in the database and selected for this item.</div>
+                        </div>
+                        <div id="poOfficeModalAlert" class="alert alert-danger py-2 small d-none mb-3"></div>
+                        <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                            <button type="button" class="btn btn-secondary px-3" onclick="closeAddOfficeModalFromPO()">Cancel</button>
+                            <button type="submit" id="btnSaveOfficeFromPO" class="btn btn-success px-4" style="background-color: var(--primary-green); border-color: var(--primary-green);">
+                                <i class="fas fa-plus me-1"></i>Add
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <?php include '../includes/footer.php'; ?>
     </body>
