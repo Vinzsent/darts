@@ -48,7 +48,8 @@ function loadPurchaseOrder($po_id, $conn) {
                     'item_description' => $item['item_description'],
                     'quantity' => $item['quantity'],
                     'unit_cost' => $item['unit_cost'],
-                    'line_total' => $item['line_total']
+                    'line_total' => $item['line_total'],
+                    'office' => $item['office'] ?? ''
                 ];
             }
         }
