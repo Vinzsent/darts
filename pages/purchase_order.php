@@ -1725,7 +1725,7 @@ if ($offices_query && $offices_query->num_rows > 0) {
                                     <?= json_encode($item['item_description']) ?>,
                                     <?= json_encode($item['quantity']) ?>,
                                     <?= floatval($item['unit_cost']) ?>,
-                                    <?= json_encode($item['location'] ?? '') ?>
+                                    <?= json_encode($item['office'] ?? '') ?>
                                 );
                             <?php endforeach; ?>
                         }, 500);
