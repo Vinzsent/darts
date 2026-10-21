@@ -155,7 +155,22 @@ function savePurchaseOrder($data, $conn, $user_id) {
                     $location_sql = $location === null ? 'NULL' : "'$location'";
                     $qty_sql = $is_qty_str ? "'$quantity_escaped'" : $num_quantity;
 
-                    $item_sql = $has_location
+                    // Office field (new column)
+                    $office = isset($item['office']) ? trim($item['office']) : '';
+                    $office_col_exists = $conn->query("SHOW COLUMNS FROM purchase_order_items LIKE 'office'")->num_rows > 0;
+                    if ($office_col_exists) {
+                        $columns .= ', office';
+                        $values .= ", '$office'";
+                    }
+                    
+                    // Build dynamic column list
+                    $columns = "po_id, item_number, item_description, quantity, unit_cost, line_total";
+                    $values = "($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total)";
+                    if ($has_location) {
+                        $item_sql = "INSERT INTO purchase_order_items ($columns, location) VALUES ($values, $location_sql)";
+                    } else {
+                        $item_sql = "INSERT INTO purchase_order_items ($columns) VALUES $values";
+                    }                    $item_sql = $has_location
                         ? "INSERT INTO purchase_order_items
                             (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
                             VALUES ($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total, $location_sql)"
