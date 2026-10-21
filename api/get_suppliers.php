@@ -1,7 +1,9 @@
 <?php
-header('Content-Type: application/json');
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 try {
     if ($conn->connect_error) {
@@ -20,18 +22,20 @@ try {
         $suppliers = [];
         while ($row = $result->fetch_assoc()) {
             // Construct full address
-            $fullAddress = $row['address'];
-            if ($row['city']) $fullAddress .= ', ' . $row['city'];
-            if ($row['province']) $fullAddress .= ', ' . $row['province'];
-            if ($row['zip_code']) $fullAddress .= ' ' . $row['zip_code'];
+            $parts = [];
+            if (!empty($row['address'])) $parts[] = trim((string)$row['address']);
+            if (!empty($row['city'])) $parts[] = trim((string)$row['city']);
+            if (!empty($row['province'])) $parts[] = trim((string)$row['province']);
+            $fullAddress = implode(', ', $parts);
+            if (!empty($row['zip_code'])) $fullAddress .= ' ' . trim((string)$row['zip_code']);
 
             $suppliers[] = [
-                'id' => $row['supplier_id'],
-                'name' => $row['supplier_name'],
-                'address' => trim($fullAddress, ', '),
-                'raw_address' => $row['address'],
-                'city' => $row['city'],
-                'province' => $row['province']
+                'id' => (string)$row['supplier_id'],
+                'name' => (string)($row['supplier_name'] ?? ''),
+                'address' => trim($fullAddress),
+                'raw_address' => (string)($row['address'] ?? ''),
+                'city' => (string)($row['city'] ?? ''),
+                'province' => (string)($row['province'] ?? '')
             ];
         }
 
