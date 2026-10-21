@@ -1,7 +1,9 @@
 <?php
-header('Content-Type: application/json');
-require_once '../includes/db.php';
-require_once '../includes/auth.php';
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+header('Content-Type: application/json; charset=utf-8');
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
 
 try {
     if ($conn->connect_error) {
