@@ -66,6 +66,9 @@ $sy_logs_raw = $_GET['sy_logs'] ?? '';
 // Campus filter (BED/TED)
 $campus_raw = strtoupper(trim($_GET['campus'] ?? ''));
 
+// Status filter
+$status_raw = trim($_GET['status'] ?? '');
+
 // Search parameter
 $search_term = trim($_GET['search'] ?? '');
 
@@ -99,6 +102,12 @@ if ($sy_inv_start && $sy_inv_end) {
 if ($campus_raw === 'BED' || $campus_raw === 'TED') {
     $campus_esc = $conn->real_escape_string($campus_raw);
     $inv_where_conditions[] = "TRIM(UPPER(i.campus)) = '$campus_esc'";
+}
+// Add status filter if provided (case-insensitive match)
+$allowed_statuses = ['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
+if ($status_raw !== '' && in_array($status_raw, $allowed_statuses, true)) {
+    $status_esc = $conn->real_escape_string($status_raw);
+    $inv_where_conditions[] = "LOWER(TRIM(i.status)) = LOWER('$status_esc')";
 }
 if ($sy_recv_start && $sy_recv_end) {
     $start_esc = $conn->real_escape_string($sy_recv_start);
@@ -692,6 +701,92 @@ if ($categories_result && $categories_result->num_rows > 0) {
         .table-header h3 {
             margin: 0;
             font-weight: 600;
+        }
+
+        /* Aircon List header layout */
+        .aircon-list-header {
+            display: block;
+            padding: 16px 20px 20px;
+        }
+
+        .aircon-header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .aircon-header-top h3 {
+            font-size: 1.25rem;
+        }
+
+        .aircon-filter-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .aircon-filter-field {
+            display: flex;
+            flex-direction: column;
+            min-width: 130px;
+        }
+
+        .aircon-filter-field .form-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            opacity: 0.85;
+            margin-bottom: 2px !important;
+        }
+
+        .aircon-filter-search {
+            flex: 1 1 260px;
+            min-width: 220px;
+        }
+
+        .aircon-filter-bar .form-control,
+        .aircon-filter-bar .form-select {
+            min-width: 130px;
+        }
+
+        .aircon-filter-search .form-control {
+            min-width: 100%;
+        }
+
+        .aircon-filter-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Keep the small header buttons compact (override .btn-add padding) */
+        .aircon-header-top .btn-add {
+            padding: 4px 12px;
+            font-size: 0.85rem;
+            border-radius: 5px;
+        }
+
+        .aircon-header-top .btn {
+            white-space: nowrap;
+        }
+
+        @media (max-width: 768px) {
+            .aircon-header-top {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .aircon-filter-field,
+            .aircon-filter-search {
+                flex: 1 1 100%;
+                min-width: 100%;
+            }
+            .aircon-filter-actions {
+                width: 100%;
+            }
         }
 
         .btn-add {
@@ -1524,56 +1619,68 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
         <!-- Aircon Table -->
         <div class="table-container">
-            <div class="table-header">
-                <h3> Aircons List</h3>
-                <div class="d-flex align-items-end gap-2">
-                    <form method="GET" class="d-flex align-items-end gap-2 mb-0">
-                        <div class="search-input">
-                            <label for="search" class="form-label mb-0 text-white">Search Aircon</label>
-                            <input type="text" id="search" name="search" class="form-control" placeholder="Search by brand, model, type, serial no., location..." value="<?= htmlspecialchars($search_term) ?>">
-                        </div>
-                        <div>
-                            <label for="sy_inv" class="form-label mb-0 text-white">School Year</label>
-                            <select id="sy_inv" name="sy_inv" class="form-select">
-                                <option value="">All</option>
-                                <?php foreach ($sy_years as $sy): ?>
-                                    <option value="<?= htmlspecialchars($sy) ?>" <?= ($sy_inv_raw === $sy) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($sy) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="campus" class="form-label mb-0 text-white">Campus</label>
-                            <select id="campus" name="campus" class="form-select">
-                                <option value="">All</option>
-                                <option value="BED" <?= ($campus_raw === 'BED') ? 'selected' : '' ?>>BED</option>
-                                <option value="TED" <?= ($campus_raw === 'TED') ? 'selected' : '' ?>>TED</option>
-                            </select>
-                        </div>
-                        <div class="pt-4">
-                            <button type="submit" class="btn btn-search">
-                                <i class="fas fa-search"></i> Search
+            <div class="table-header aircon-list-header">
+                <div class="aircon-header-top">
+                    <h3 class="mb-0"><i class="fas fa-snowflake me-2"></i>Aircons List</h3>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <a id="airconExportBtn" class="btn btn-success btn-sm" href="../actions/export_aircons.php?search=<?= urlencode($search_term) ?>&sy_inv=<?= urlencode($sy_inv_raw) ?>&campus=<?= urlencode($campus_raw) ?>&status=<?= urlencode($status_raw) ?>">
+                            <i class="fas fa-file-export"></i> Export
+                        </a>
+                        <?php if ($can_manage_aircon): ?>
+                            <button class="btn btn-add text-dark btn-sm" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
+                                <i class="fas fa-plus"></i> Add Aircon
                             </button>
-                            <?php if (!empty($search_term) || !empty($sy_inv_raw) || !empty($campus_raw)): ?>
-                                <a href="aircon_list.php" class="btn btn-outline-light ms-2">
-                                    <i class="fas fa-times"></i> Clear
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </form>
-                    <a class="btn btn-success" href="../actions/export_aircons.php?search=<?= urlencode($search_term) ?>&sy_inv=<?= urlencode($sy_inv_raw) ?>&campus=<?= urlencode($campus_raw) ?>">
-                        <i class="fas fa-file-export"></i> Export
-                    </a>
-                    <?php if ($can_manage_aircon): ?>
-                        <button class="btn btn-add text-dark" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
-                            <i class="fas fa-plus"></i> Add Aircon
-                        </button>
-                        <button type="button" class="btn btn-success btn-print-all-qr" onclick="printAllAirconQr()">
-                            <i class="fas fa-qrcode me-1"></i> Print All QR Codes
-                        </button>
-                    <?php endif; ?>
+                            <button type="button" class="btn btn-success btn-sm btn-print-all-qr" onclick="printAllAirconQr()">
+                                <i class="fas fa-qrcode"></i> Print All QR
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
+
+                <form method="GET" class="aircon-filter-bar" id="airconFilterForm">
+                    <div class="aircon-filter-field aircon-filter-search search-input">
+                        <label for="search" class="form-label mb-0 text-white">Search Aircon</label>
+                        <input type="text" id="search" name="search" class="form-control form-control-sm" placeholder="Brand, model, type, serial no., location..." value="<?= htmlspecialchars($search_term) ?>">
+                    </div>
+                    <div class="aircon-filter-field">
+                        <label for="sy_inv" class="form-label mb-0 text-white">School Year</label>
+                        <select id="sy_inv" name="sy_inv" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <?php foreach ($sy_years as $sy): ?>
+                                <option value="<?= htmlspecialchars($sy) ?>" <?= ($sy_inv_raw === $sy) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($sy) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="aircon-filter-field">
+                        <label for="campus" class="form-label mb-0 text-white">Campus</label>
+                        <select id="campus" name="campus" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="BED" <?= ($campus_raw === 'BED') ? 'selected' : '' ?>>BED</option>
+                            <option value="TED" <?= ($campus_raw === 'TED') ? 'selected' : '' ?>>TED</option>
+                        </select>
+                    </div>
+                    <div class="aircon-filter-field">
+                        <label for="status" class="form-label mb-0 text-white">Status</label>
+                        <select id="status" name="status" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <?php foreach (['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'] as $st): ?>
+                                <option value="<?= htmlspecialchars($st) ?>" <?= ($status_raw === $st) ? 'selected' : '' ?>><?= htmlspecialchars($st) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="aircon-filter-actions">
+                        <button type="submit" class="btn btn-search btn-sm">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <?php if (!empty($search_term) || !empty($sy_inv_raw) || !empty($campus_raw) || !empty($status_raw)): ?>
+                            <a href="aircon_list.php" class="btn btn-outline-light btn-sm">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
             </div>
 
 
@@ -1862,7 +1969,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         </div>
                         <form action="../actions/add_aircon.php" method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="receiver" value="Property Custodian">
-                            <input type="hidden" name="status" value="Active">
                             <div class="modal-body">
                                 <!-- Basic Information -->
                                 <div class="mb-3 pb-2 border-bottom">
@@ -1931,6 +2037,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <label class="form-label">Status</label>
                                             <select name="status" class="form-select">
                                                 <option value="Working">Working</option>
+                                                <option value="Replace">Replace</option>
                                                 <option value="Needs Repair">Needs Repair</option>
                                                 <option value="Under Maintenance">Under Maintenance</option>
                                                 <option value="Decommissioned">Decommissioned</option>
@@ -3205,6 +3312,16 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             url.searchParams.delete('page');
                             window.history.pushState({}, '', url);
 
+                            // Keep the Export link in sync with the current search term
+                            const exportBtn = document.getElementById('airconExportBtn');
+                            if (exportBtn) {
+                                const exportParams = new URLSearchParams(window.location.search);
+                                exportParams.set('search', searchTerm);
+                                exportParams.delete('ajax');
+                                exportParams.delete('page');
+                                exportBtn.href = '../actions/export_aircons.php?' + exportParams.toString();
+                            }
+
                             // Smooth scroll to top of table
                             const table = document.querySelector('.table-responsive');
                             if (table) {
@@ -3788,9 +3905,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     loadInventory(parseInt(page));
 
                     // Auto-submit filters on change
-                    const filterForm = document.querySelector('.table-header form');
+                    const filterForm = document.getElementById('airconFilterForm');
                     const campusSel = document.getElementById('campus');
                     const sySel = document.getElementById('sy_inv');
+                    const statusSel = document.getElementById('status');
                     if (filterForm && campusSel) {
                         campusSel.addEventListener('change', function() {
                             filterForm.submit();
@@ -3798,6 +3916,11 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     }
                     if (filterForm && sySel) {
                         sySel.addEventListener('change', function() {
+                            filterForm.submit();
+                        });
+                    }
+                    if (filterForm && statusSel) {
+                        statusSel.addEventListener('change', function() {
                             filterForm.submit();
                         });
                     }
@@ -4120,6 +4243,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
             $search_term_ajax = trim($_GET['search'] ?? '');
             $sy_inv_raw_ajax = $_GET['sy_inv'] ?? '';
             $campus_raw_ajax = strtoupper(trim($_GET['campus'] ?? ''));
+$status_raw_ajax = trim($_GET['status'] ?? '');
 
             // Rebuild WHERE conditions for AJAX
             $inv_where_conditions_ajax = [];
@@ -4142,6 +4266,12 @@ if ($categories_result && $categories_result->num_rows > 0) {
             if ($campus_raw_ajax === 'BED' || $campus_raw_ajax === 'TED') {
                 $campus_esc_ajax = $conn->real_escape_string($campus_raw_ajax);
                 $inv_where_conditions_ajax[] = "TRIM(UPPER(pi.campus)) = '$campus_esc_ajax'";
+            }
+            // Status filter for AJAX (case-insensitive match)
+            $allowed_statuses_ajax = ['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
+            if ($status_raw_ajax !== '' && in_array($status_raw_ajax, $allowed_statuses_ajax, true)) {
+                $status_esc_ajax = $conn->real_escape_string($status_raw_ajax);
+                $inv_where_conditions_ajax[] = "LOWER(TRIM(pi.status)) = LOWER('$status_esc_ajax')";
             }
 
             $inv_where_ajax = !empty($inv_where_conditions_ajax) ? ' WHERE ' . implode(' AND ', $inv_where_conditions_ajax) : '';

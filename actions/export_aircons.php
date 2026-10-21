@@ -39,6 +39,12 @@ $fmt_num = function ($val, $dec = 2) {
 $search_term = trim($_GET['search'] ?? '');
 $sy_inv_raw  = $_GET['sy_inv'] ?? '';
 $campus_raw  = strtoupper(trim($_GET['campus'] ?? ($_GET['dept'] ?? '')));
+$status_raw  = trim($_GET['status'] ?? '');
+
+$allowed_statuses = ['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
+if (!in_array($status_raw, $allowed_statuses, true)) {
+    $status_raw = '';
+}
 
 list($sy_inv_start, $sy_inv_end) = parse_school_year_range($sy_inv_raw);
 
@@ -58,6 +64,11 @@ if ($sy_inv_start && $sy_inv_end) {
 if ($campus_raw === 'BED' || $campus_raw === 'TED') {
     $campus_esc = $conn->real_escape_string($campus_raw);
     $inv_where_conditions[] = "i.campus = '$campus_esc'";
+}
+
+if ($status_raw !== '') {
+    $status_esc = $conn->real_escape_string($status_raw);
+    $inv_where_conditions[] = "LOWER(TRIM(i.status)) = LOWER('$status_esc')";
 }
 
 $inv_where = !empty($inv_where_conditions) ? ' WHERE ' . implode(' AND ', $inv_where_conditions) : '';
