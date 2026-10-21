@@ -12,6 +12,29 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     $isAjax = false;
 }
 
+// Handle print_all_qr AJAX request - return all aircons as JSON (no pagination)
+if ($isAjax && !empty($_GET['print_all_qr'])) {
+    $sql = "SELECT pi.aircon_id, pi.item_number, pi.serial_number, pi.brand, pi.model, pi.location, pi.campus
+            FROM aircons pi
+            ORDER BY pi.aircon_id ASC";
+    $result = $conn->query($sql);
+    $aircons = [];
+    while ($row = $result->fetch_assoc()) {
+        $aircons[] = [
+            'id' => (int)$row['aircon_id'],
+            'item_number' => htmlspecialchars($row['item_number'] ?? '', ENT_QUOTES),
+            'serial_number' => htmlspecialchars($row['serial_number'] ?? '', ENT_QUOTES),
+            'brand' => htmlspecialchars($row['brand'] ?? '', ENT_QUOTES),
+            'model' => htmlspecialchars($row['model'] ?? '', ENT_QUOTES),
+            'location' => htmlspecialchars($row['location'] ?? '', ENT_QUOTES),
+            'campus' => htmlspecialchars($row['campus'] ?? '', ENT_QUOTES),
+        ];
+    }
+    header('Content-Type: application/json');
+    echo json_encode($aircons);
+    exit;
+}
+
 $user_type = $_SESSION['user_type'] ?? $_SESSION['user']['user_type'] ?? '';
 $user_role_norm = str_replace([' ', '-'], '', strtolower($user_type));
 $can_manage_aircon = !in_array($user_role_norm, ['purchasingstaff', 'purchasingofficer']);
@@ -4022,30 +4045,42 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
                 // Print all aircon QR codes with their unique codes
                 function printAllAirconQr() {
-                    var rows = document.querySelectorAll('#inventoryTable table tbody tr');
-                    if (rows.length === 0) { alert('No aircon units to print.'); return; }
-                    var qrItems = [], pending = 0;
-                    rows.forEach(function(row) {
-                        var btn = row.querySelector('.btn-print-single-qr');
-                        if (!btn) return;
-                        var airconId = btn.getAttribute('data-aircon-id');
-                        var itemNum = btn.getAttribute('data-item-number') || '';
-                        var serialNum = btn.getAttribute('data-serial-number') || '';
-                        var brand = btn.getAttribute('data-brand') || '';
-                        var model = btn.getAttribute('data-model') || '';
-                        var campus = btn.getAttribute('data-campus') || '';
-                        var location = btn.getAttribute('data-location') || '';
-                        var displayCode = (itemNum && itemNum !== 'N/A') ? itemNum : (serialNum && serialNum !== 'N/A') ? serialNum : ('AC-' + String(airconId).padStart(4, '0'));
-                        pending++;
-                        fetch('../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&t=' + Date.now(), { credentials: 'same-origin' })
-                            .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.blob(); })
-                            .then(function(blob) {
-                                qrItems.push({ id: airconId, code: displayCode, brand: brand, model: model, campus: campus, location: location, imgUrl: URL.createObjectURL(blob) });
-                                pending--;
-                                if (pending === 0) renderAllQrPrint(qrItems);
-                            })
-                            .catch(function(err) { console.error('QR fetch error for ' + airconId + ':', err); pending--; if (pending === 0) renderAllQrPrint(qrItems); });
-                    });
+                    // Step 1: Fetch ALL aircon records (ignoring pagination/filters) via AJAX
+                    fetch('aircon_list.php?ajax=1&print_all_qr=1&t=' + Date.now(), { credentials: 'same-origin' })
+                        .then(function(response) {
+                            if (!response.ok) throw new Error('HTTP ' + response.status);
+                            return response.json();
+                        })
+                        .then(function(aircons) {
+                            if (!aircons || aircons.length === 0) {
+                                alert('No aircon units found.');
+                                return;
+                            }
+                            var qrItems = [], pending = 0;
+                            aircons.forEach(function(ac) {
+                                var airconId = ac.id;
+                                var itemNum = ac.item_number || '';
+                                var serialNum = ac.serial_number || '';
+                                var brand = ac.brand || '';
+                                var model = ac.model || '';
+                                var campus = ac.campus || '';
+                                var location = ac.location || '';
+                                var displayCode = (itemNum && itemNum !== 'N/A') ? itemNum : (serialNum && serialNum !== 'N/A') ? serialNum : ('AC-' + String(airconId).padStart(4, '0'));
+                                pending++;
+                                fetch('../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&t=' + Date.now(), { credentials: 'same-origin' })
+                                    .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.blob(); })
+                                    .then(function(blob) {
+                                        qrItems.push({ id: airconId, code: displayCode, brand: brand, model: model, campus: campus, location: location, imgUrl: URL.createObjectURL(blob) });
+                                        pending--;
+                                        if (pending === 0) renderAllQrPrint(qrItems);
+                                    })
+                                    .catch(function(err) { console.error('QR fetch error for ' + airconId + ':', err); pending--; if (pending === 0) renderAllQrPrint(qrItems); });
+                            });
+                        })
+                        .catch(function(err) {
+                            console.error('Fetch all aircons error:', err);
+                            alert('Failed to load aircon list: ' + err.message);
+                        });
                 }
 
                 function renderAllQrPrint(items) {

@@ -81,6 +81,7 @@ try {
         $poi_cols[] = $col['Field'];
     }
     $poi_recv_col = in_array('received_date', $poi_cols, true) ? 'poi.received_date' : (in_array('date_received', $poi_cols, true) ? 'poi.date_received AS received_date' : 'NULL AS received_date');
+    $office_col = in_array('office', $poi_cols, true) ? 'poi.office AS item_office' : 'NULL AS item_office';
     // Per-item receiver (who clicked Receive on that line). Older databases may
     // not have the column yet, so fall back to the PO-level receiver.
     $has_item_recv_by = in_array('received_by', $poi_cols, true);
@@ -116,6 +117,7 @@ try {
             poi.line_total,
             poi.is_received,
             $poi_recv_col,
+            $office_col,
             $item_recv_qty_col,
             $item_recv_by_col,
             COALESCE($item_receiver_expr, " . ($has_item_recv_by ? "iu.username" : "ru.username") . ", NULLIF(" . ($has_item_recv_by ? "poi.received_by" : "p.received_by") . ", ''), 'Unknown') AS item_received_by_name,

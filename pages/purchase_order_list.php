@@ -1158,6 +1158,7 @@ $verifier_name = 'Marilou L. Suarez';
             itemsHtml += `
                 <tr>
                     <td>${item.item_description}</td>
+                    <td>${item.item_office ? String(item.item_office) : '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>'}</td>
                     <td>${qtyCell}</td>
                     <td>₱${parseFloat(item.unit_cost).toFixed(2)}</td>
                     <td>₱${parseFloat(item.line_total).toFixed(2)}</td>
@@ -1179,6 +1180,9 @@ $verifier_name = 'Marilou L. Suarez';
                         <p><strong>Date:</strong> ${new Date(po.po_date).toLocaleDateString()}</p>
                         <p><strong>Status:</strong> <span class="status-badge status-${po.status.toLowerCase()}">${po.status}</span></p>
                         <p><strong>Payment Method:</strong> ${po.payment_method || 'N/A'}</p>
+                        ${items && items.length
+                            ? `<p><strong>Office:</strong> ${[...new Set(items.map(it => it.item_office).filter(Boolean))].join(', ') || '—'}</p>`
+                            : '<p><strong>Office:</strong> —</p>'}
                         ${po.status === 'Received' || po.received_date ? `
                             <p><strong>Received Date:</strong> ${po.received_date ? new Date(po.received_date).toLocaleString() : 'N/A'}</p>
                         ` : ''}
@@ -1197,6 +1201,7 @@ $verifier_name = 'Marilou L. Suarez';
                     <thead style="background: linear-gradient(135deg, var(--primary-green) 0%, var(--dark-green) 100%); color: white;">
                         <tr>
                             <th>Item Description</th>
+                            <th style="width: 14%;">Office</th>
                             <th style="min-width:120px;">Qty (Ordered / Received)</th>
                             <th>Unit Cost</th>
                             <th>Total</th>
@@ -1209,7 +1214,7 @@ $verifier_name = 'Marilou L. Suarez';
                     <tbody>
                         ${itemsHtml}
                         <tr style="background-color: var(--primary-green); color: white; font-weight: bold;">
-                            <td colspan="4" style="text-align: right;">GRAND TOTAL:</td>
+                            <td colspan="5" style="text-align: right;">GRAND TOTAL:</td>
                             <td>₱${grandTotal.toFixed(2)}</td>
                             <td></td>
                             <td></td>

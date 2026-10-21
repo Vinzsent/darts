@@ -163,20 +163,12 @@ function savePurchaseOrder($data, $conn, $user_id) {
                         $values .= ", '$office'";
                     }
                     
-                    // Build dynamic column list
-                    $columns = "po_id, item_number, item_description, quantity, unit_cost, line_total";
-                    $values = "($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total)";
+                    // Build dynamic column list (office/location already appended above if columns exist)
                     if ($has_location) {
-                        $item_sql = "INSERT INTO purchase_order_items ($columns, location) VALUES ($values, $location_sql)";
-                    } else {
-                        $item_sql = "INSERT INTO purchase_order_items ($columns) VALUES $values";
-                    }                    $item_sql = $has_location
-                        ? "INSERT INTO purchase_order_items
-                            (po_id, item_number, item_description, quantity, unit_cost, line_total, location)
-                            VALUES ($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total, $location_sql)"
-                        : "INSERT INTO purchase_order_items
-                            (po_id, item_number, item_description, quantity, unit_cost, line_total)
-                            VALUES ($po_id, $item_number, '$description', $qty_sql, $unit_cost, $line_total)";
+                        $columns .= ', location';
+                        $values .= ", $location_sql";
+                    }
+                    $item_sql = "INSERT INTO purchase_order_items ($columns) VALUES $values";
                     
                     if (!$conn->query($item_sql)) {
                         throw new Exception('Failed to save item: ' . $conn->error);
