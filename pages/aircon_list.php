@@ -1477,6 +1477,26 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 /* 12px */
                 padding: 0.25rem 0.4rem;
             }
+
+            /* QR Code Print Container Styles */
+            .qr-print-container {
+                max-width: 280px;
+                margin: 0 auto;
+            }
+            .qr-card {
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                background: #fff;
+            }
+            .qr-print-container .btn-print-single-qr {
+                width: 100%;
+                justify-content: center;
+            }
+            @media print {
+                .qr-print-container { display: block !important; }
+                .no-print { display: none !important; }
+                .qr-print-item { page-break-inside: avoid; }
+            }
         </style>
 
         <!-- Aircon Table -->
@@ -1526,6 +1546,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         <button class="btn btn-add text-dark" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
                             <i class="fas fa-plus"></i> Add Aircon
                         </button>
+                        <button type="button" class="btn btn-success btn-print-all-qr" onclick="printAllAirconQr()">
+                            <i class="fas fa-qrcode me-1"></i> Print All QR Codes
+                        </button>
                     <?php endif; ?>
                 </div>
             </div>
@@ -1574,6 +1597,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <th>Installation Date/ Release Date</th>
                                 <th>Notes</th>
                                 <?php if ($can_manage_aircon): ?>
+                                    <th>QR Code</th>
                                     <th>Actions</th>
                                 <?php endif; ?>
                             </tr>
@@ -1617,6 +1641,21 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td data-label="Installation Date"><?= !empty($row['installation_date']) ? date('M d, Y', strtotime($row['installation_date'])) : 'N/A' ?></td>
                                         <td data-label="Notes"><?= htmlspecialchars($row['notes'] ?? 'N/A') ?></td>
                                         <?php if ($can_manage_aircon): ?>
+                                            <td data-label="QR Code" class="text-center">
+                                                <button type="button" class="btn btn-outline-info btn-sm btn-print-single-qr"
+                                                    onclick="printSingleAirconQr(<?= (int)$row['aircon_id'] ?>, this)"
+                                                    title="Print QR Code"
+                                                    data-aircon-id="<?= (int)$row['aircon_id'] ?>"
+                                                    data-item-number="<?= htmlspecialchars($row['item_number'] ?? '', ENT_QUOTES) ?>"
+                                                    data-serial-number="<?= htmlspecialchars($row['serial_number'] ?? '', ENT_QUOTES) ?>"
+                                                    data-brand="<?= htmlspecialchars($row['brand'] ?? '', ENT_QUOTES) ?>"
+                                                    data-model="<?= htmlspecialchars($row['model'] ?? '', ENT_QUOTES) ?>"
+                                                    data-location="<?= htmlspecialchars($row['location'] ?? '', ENT_QUOTES) ?>"
+                                                    data-campus="<?= htmlspecialchars($row['campus'] ?? '', ENT_QUOTES) ?>">
+                                                    <i class="fas fa-qrcode me-1"></i> QR
+                                                </button>
+                                                <div id="qr-display-<?= (int)$row['aircon_id'] ?>" class="qr-print-container mt-2" style="display:none;"></div>
+                                            </td>
                                             <td data-label="Actions" class="actions">
                                                 <button class="btn btn-sm btn-primary view-aircon-details-btn"
                                                     title="View Details"
@@ -1688,7 +1727,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="14" class="text-center py-4">
+                                    <td colspan="15" class="text-center py-4">
                                         <i class="fas fa-snowflake fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">No aircon units found</p>
                                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
@@ -3945,6 +3984,89 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         form.submit();
                     }
                 }
+
+                // ── QR Code Printing: escape helper ─────────────────────────
+                function escapeHtmlQr(text) {
+                    if (!text) return '';
+                    var div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+
+                // Fetch and display QR code for a single aircon below its button
+                function printSingleAirconQr(airconId, btn) {
+                    var displayDiv = document.getElementById('qr-display-' + airconId);
+                    if (!displayDiv) return;
+                    if (displayDiv.style.display === 'block') {
+                        displayDiv.style.display = 'none';
+                        return;
+                    }
+                    document.querySelectorAll('.qr-print-container').forEach(function(d) { d.style.display = 'none'; });
+                    displayDiv.innerHTML = '<div class="text-center"><div class="spinner-border text-success" role="status"><span class="visually-hidden">Loading QR...</span></div></div>';
+                    displayDiv.style.display = 'block';
+                    fetch('../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&t=' + Date.now(), { credentials: 'same-origin' })
+                        .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.blob(); })
+                        .then(function(blob) {
+                            var url = URL.createObjectURL(blob);
+                            var itemNum = btn.getAttribute('data-item-number') || '';
+                            var serialNum = btn.getAttribute('data-serial-number') || '';
+                            var brand = btn.getAttribute('data-brand') || '';
+                            var model = btn.getAttribute('data-model') || '';
+                            var campus = btn.getAttribute('data-campus') || '';
+                            var location = btn.getAttribute('data-location') || '';
+                            var displayCode = (itemNum && itemNum !== 'N/A') ? itemNum : (serialNum && serialNum !== 'N/A') ? serialNum : ('AC-' + String(airconId).padStart(4, '0'));
+                            displayDiv.innerHTML = '<div class="card border-0 shadow-sm qr-card" style="max-width:260px; margin:0 auto;"><div class="card-body p-3 text-center"><img src="' + url + '" alt="QR Code" style="width:140px;height:140px;object-fit:contain;border:1px solid #dee2e6;border-radius:8px;background:#fff;padding:8px;" onload="URL.revokeObjectURL(\'' + url + '\')"><div class="mt-3"><small class="text-muted d-block">Aircon ID: <strong>#' + airconId + '</strong></small><small class="text-muted d-block">Code: <strong>' + escapeHtmlQr(displayCode) + '</strong></small><small class="text-muted d-block">' + escapeHtmlQr(brand) + ' ' + escapeHtmlQr(model) + '</small><small class="text-muted d-block">' + escapeHtmlQr(campus) + ' - ' + escapeHtmlQr(location) + '</small><button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="window.print()"><i class="fas fa-print me-1"></i> Print This QR</button></div></div></div>';
+                        })
+                        .catch(function(err) { console.error('QR fetch error:', err); displayDiv.innerHTML = '<div class="alert alert-danger mt-2 text-center small">Could not load QR code for this unit.</div>'; });
+                }
+
+                // Print all aircon QR codes with their unique codes
+                function printAllAirconQr() {
+                    var rows = document.querySelectorAll('#inventoryTable table tbody tr');
+                    if (rows.length === 0) { alert('No aircon units to print.'); return; }
+                    var qrItems = [], pending = 0;
+                    rows.forEach(function(row) {
+                        var btn = row.querySelector('.btn-print-single-qr');
+                        if (!btn) return;
+                        var airconId = btn.getAttribute('data-aircon-id');
+                        var itemNum = btn.getAttribute('data-item-number') || '';
+                        var serialNum = btn.getAttribute('data-serial-number') || '';
+                        var brand = btn.getAttribute('data-brand') || '';
+                        var model = btn.getAttribute('data-model') || '';
+                        var campus = btn.getAttribute('data-campus') || '';
+                        var location = btn.getAttribute('data-location') || '';
+                        var displayCode = (itemNum && itemNum !== 'N/A') ? itemNum : (serialNum && serialNum !== 'N/A') ? serialNum : ('AC-' + String(airconId).padStart(4, '0'));
+                        pending++;
+                        fetch('../actions/view_aircon_qr.php?id=' + encodeURIComponent(airconId) + '&t=' + Date.now(), { credentials: 'same-origin' })
+                            .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.blob(); })
+                            .then(function(blob) {
+                                qrItems.push({ id: airconId, code: displayCode, brand: brand, model: model, campus: campus, location: location, imgUrl: URL.createObjectURL(blob) });
+                                pending--;
+                                if (pending === 0) renderAllQrPrint(qrItems);
+                            })
+                            .catch(function(err) { console.error('QR fetch error for ' + airconId + ':', err); pending--; if (pending === 0) renderAllQrPrint(qrItems); });
+                    });
+                }
+
+                function renderAllQrPrint(items) {
+                    if (items.length === 0) { alert('No QR codes could be loaded.'); return; }
+                    items.sort(function(a, b) { return parseInt(a.id) - parseInt(b.id); });
+                    var printHtml = '';
+                    items.forEach(function(item) {
+                        printHtml += '<div class="qr-print-item" style="page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center;"><img src="' + item.imgUrl + '" alt="QR Code" style="width:120px;height:120px;object-fit:contain;border:1px solid #dee2e6;border-radius:6px;background:#fff;padding:6px;"><div class="mt-3"><div><strong style="font-size:0.9rem;">Aircon #</strong> <span style="font-size:1.1rem; color:#073b1d;">' + item.id + '</span></div><div><small class="text-muted d-block">Code:</small> <strong style="font-size:0.85rem; word-break:break-all;">' + escapeHtmlQr(item.code) + '</strong></div><div><small class="text-muted d-block">Brand / Model:</small> <span style="font-size:0.8rem;">' + escapeHtmlQr(item.brand) + ' / ' + escapeHtmlQr(item.model) + '</span></div><div><small class="text-muted d-block">Campus / Location:</small> <span style="font-size:0.8rem;">' + escapeHtmlQr(item.campus) + ' / ' + escapeHtmlQr(item.location) + '</span></div></div></div>';
+                    });
+                    var printWindow = window.open('', '', 'height=800,width=1200');
+                    printWindow.document.write('<html><head><title>Print All Aircon QR Codes</title>');
+                    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
+                    printWindow.document.write('<style>body { padding: 20px; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; } h1 { text-align: center; color: #073b1d; margin-bottom: 30px; } .qr-print-item { page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center; background:#fff; } .qr-print-item img { width:120px; height:120px; object-fit:contain; border:1px solid #dee2e6; border-radius:6px; background:#fff; padding:6px; } .print-header { text-align:center; margin-bottom:30px; } @media print { body { padding: 0; } .no-print { display:none; } }</style></head><body>');
+                    printWindow.document.write('<div class="print-header"><h1><i class="fas fa-qrcode me-2"></i>Aircon QR Code Labels</h1><p class="text-muted">Total: ' + items.length + ' unit(s) | Printed: ' + new Date().toLocaleString() + '</p></div>');
+                    printWindow.document.write('<div class="qr-print-grid">' + printHtml + '</div>');
+                    printWindow.document.write('<div class="text-center mt-4 no-print"><button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-1"></i> Print</button><button class="btn btn-secondary ms-2" onclick="window.close()"><i class="fas fa-times me-1"></i> Close</button></div>');
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    setTimeout(function() { printWindow.print(); }, 500);
+                }
             </script>
         <?php endif; ?>
 
@@ -4021,6 +4143,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
             echo '<th>Maintenance Schedule</th>';
             echo '<th>Installation Date/ Release Date</th>';
             echo '<th>Notes</th>';
+            if ($can_manage_aircon) echo '<th>QR Code</th>';
             if ($can_manage_aircon) echo '<th>Actions</th>';
             echo '</tr>';
             echo '</thead><tbody>';
@@ -4061,6 +4184,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '<td data-label="Installation Date/ Release Date">' . (!empty($row['installation_date']) ? date('M d, Y', strtotime($row['installation_date'])) : 'N/A') . '</td>';
                     echo '<td data-label="Notes">' . htmlspecialchars($row['notes'] ?? 'N/A') . '</td>';
                     if ($can_manage_aircon) {
+                        echo '<td data-label="QR Code" class="text-center">';
+                        echo '<button type="button" class="btn btn-outline-info btn-sm btn-print-single-qr" onclick="printSingleAirconQr(' . (int)$row['aircon_id'] . ', this)" title="Print QR Code" data-aircon-id="' . (int)$row['aircon_id'] . '" data-item-number="' . htmlspecialchars($row['item_number'] ?? '', ENT_QUOTES) . '" data-serial-number="' . htmlspecialchars($row['serial_number'] ?? '', ENT_QUOTES) . '" data-brand="' . htmlspecialchars($row['brand'] ?? '', ENT_QUOTES) . '" data-model="' . htmlspecialchars($row['model'] ?? '', ENT_QUOTES) . '" data-location="' . htmlspecialchars($row['location'] ?? '', ENT_QUOTES) . '" data-campus="' . htmlspecialchars($row['campus'] ?? '', ENT_QUOTES) . '"><i class="fas fa-qrcode me-1"></i> QR</button>';
+                        echo '<div id="qr-display-' . (int)$row['aircon_id'] . '" class="qr-print-container mt-2" style="display:none;"></div>';
+                        echo '</td>';
                         echo '<td data-label="Actions" class="actions">';
                         echo '<button class="btn btn-sm btn-primary" title="View Details" onclick=\'viewAirconDetails('
                             . (int)$row['aircon_id'] . ', '
@@ -4123,7 +4250,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     echo '</tr>';
                 }
             } else {
-                echo '<tr><td colspan="14" class="text-center py-4"><i class="fas fa-snowflake fa-3x text-muted mb-3"></i><p class="text-muted">No aircon units found</p></td></tr>';
+                echo '<tr><td colspan="15" class="text-center py-4"><i class="fas fa-snowflake fa-3x text-muted mb-3"></i><p class="text-muted">No aircon units found</p></td></tr>';
             }
 
             echo '</tbody></table></div>';

@@ -8,6 +8,21 @@ include 'includes/header.php';
 // Get user type from session and normalize it (remove spaces and hyphens, convert to lowercase)
 $raw_user_type = $_SESSION['user_type'] ?? $_SESSION['user']['user_type'] ?? '';
 $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
+
+// Purchasing Officer/Staff stats
+$po_stats = [];
+if (in_array($user_type, ['purchasingofficer', 'purchasingstaff', 'purcashingstaff', 'purchsingstaff'])) {
+    $r = $conn->query("SELECT COUNT(*) as total, COALESCE(SUM(total_amount),0) as sum FROM purchase_orders");
+    $po_stats['total_po'] = $r ? (int)$r->fetch_assoc()['total'] : 0;
+    $r = $conn->query("SELECT COUNT(*) as cnt FROM purchase_orders WHERE status = 'Draft'");
+    $po_stats['draft'] = $r ? (int)$r->fetch_assoc()['cnt'] : 0;
+    $r = $conn->query("SELECT COUNT(*) as cnt FROM purchase_orders WHERE status = 'Received'");
+    $po_stats['received'] = $r ? (int)$r->fetch_assoc()['cnt'] : 0;
+    $r = $conn->query("SELECT COUNT(*) as cnt FROM purchase_orders WHERE DATE(created_at) = CURDATE()");
+    $po_stats['today'] = $r ? (int)$r->fetch_assoc()['cnt'] : 0;
+    $r = $conn->query("SELECT COUNT(*) as cnt FROM offices WHERE status = 'Active'");
+    $po_stats['offices'] = $r ? (int)$r->fetch_assoc()['cnt'] : 0;
+}
 ?>
 <?php include('./includes/navbar.php'); ?>
 
@@ -756,6 +771,60 @@ $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
       </div>
 
     <?php elseif ($user_type === 'purchasingofficer' || $user_type === 'purchasingstaff' || $user_type === 'purcashingstaff' || $user_type === 'purchsingstaff'): ?>
+      <!-- Stats Summary Row -->
+      <div class="po-stats-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem;">
+
+        <div class="po-stat-card" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+          <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#facc15,#f59e0b); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-file-alt" style="color:#073b1d; font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:1.6rem; font-weight:800; color:#fff; line-height:1;"><?= number_format($po_stats['total_po'] ?? 0) ?></div>
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">Total POs</div>
+          </div>
+        </div>
+
+        <div class="po-stat-card" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+          <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#f97316,#ef4444); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-pencil-alt" style="color:#fff; font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:1.6rem; font-weight:800; color:#fff; line-height:1;"><?= number_format($po_stats['draft'] ?? 0) ?></div>
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">Draft / Pending</div>
+          </div>
+        </div>
+
+        <div class="po-stat-card" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+          <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#22c55e,#16a34a); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-check-circle" style="color:#fff; font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:1.6rem; font-weight:800; color:#fff; line-height:1;"><?= number_format($po_stats['received'] ?? 0) ?></div>
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">Received</div>
+          </div>
+        </div>
+
+        <div class="po-stat-card" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+          <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#06b6d4,#3b82f6); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-calendar-day" style="color:#fff; font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:1.6rem; font-weight:800; color:#fff; line-height:1;"><?= number_format($po_stats['today'] ?? 0) ?></div>
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">Today's POs</div>
+          </div>
+        </div>
+
+        <div class="po-stat-card" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; backdrop-filter: blur(8px); transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
+          <div style="width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#a855f7,#7c3aed); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <i class="fas fa-building" style="color:#fff; font-size:1.1rem;"></i>
+          </div>
+          <div>
+            <div style="font-size:1.6rem; font-weight:800; color:#fff; line-height:1;"><?= number_format($po_stats['offices'] ?? 0) ?></div>
+            <div style="font-size:0.72rem; color:rgba(255,255,255,0.75); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;">Active Offices</div>
+          </div>
+        </div>
+
+      </div>
       <!-- Cards for Purchasing Staff and Officers -->
 
       <!-- Assignment Card -->
