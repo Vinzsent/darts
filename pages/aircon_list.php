@@ -2082,18 +2082,24 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
             <!-- Add New Aircon Modal -->
             <div class="modal fade" id="addInventoryModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header" style="background-color: var(--primary-green);">
-                            <h5 class="modal-title text-white">Add New Aircon</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-dialog modal-xl modal-dialog-scrollable aircon-edit-dialog">
+                    <div class="modal-content aircon-edit-modal">
+                        <div class="modal-header aircon-edit-header">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="aircon-edit-icon"><i class="fas fa-plus"></i></span>
+                                <div>
+                                    <h5 class="modal-title text-white mb-0">Add New Aircon</h5>
+                                    <small class="aircon-edit-subtitle">Register a new aircon unit to the inventory</small>
+                                </div>
+                            </div>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <form action="../actions/add_aircon.php" method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="receiver" value="Property Custodian">
-                            <div class="modal-body">
-                                <!-- Basic Information -->
-                                <div class="mb-3 pb-2 border-bottom">
-                                    <h6 class="mb-3 text-uppercase text-muted">Basic Information</h6>
+                            <div class="modal-body aircon-edit-body">
+                                <!-- Unit Information -->
+                                <div class="aircon-edit-section mb-3">
+                                    <h6 class="aircon-edit-section-title"><i class="fas fa-snowflake me-2"></i>Unit Information</h6>
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <label class="form-label">Item Number <span class="text-danger">*</span></label>
@@ -2155,17 +2161,21 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <input type="text" name="location" class="form-control" placeholder="e.g., Room 101, Office">
                                         </div>
                                         <div class="col-md-3">
+                                            <label class="form-label">Area</label>
+                                            <input type="text" name="area" class="form-control" placeholder="e.g., Ground Floor, Annex">
+                                        </div>
+                                        <div class="col-md-3">
                                             <label class="form-label">Status</label>
                                             <select name="status" class="form-select">
                                                 <option value="Working">Working</option>
                                                 <option value="Replace">Replace</option>
                                                 <option value="Needs Repair">Needs Repair</option>
+                                                <option value="Needs Attention">Needs Attention</option>
                                                 <option value="Under Maintenance">Under Maintenance</option>
                                                 <option value="Decommissioned">Decommissioned</option>
                                                 <option value="Not Applicable">Not Applicable</option>
                                             </select>
                                         </div>
-
                                         <div class="col-md-3">
                                             <label class="form-label">Campus</label>
                                             <select name="campus" class="form-select">
@@ -2173,13 +2183,20 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <option value="BED">BED</option>
                                             </select>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- Dates & Supplier -->
+                                <div class="aircon-edit-section mb-3">
+                                    <h6 class="aircon-edit-section-title"><i class="fas fa-calendar-alt me-2"></i>Dates & Supplier</h6>
+                                    <div class="row g-3">
                                         <div class="col-md-3">
                                             <label class="form-label">Purchase Date</label>
                                             <input type="date" name="purchase_date" class="form-control">
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label">Warranty Expiry</label>
-                                            <input type="text" name="warranty_expiry" class="form-control">
+                                            <input type="date" name="warranty_expiry" class="form-control">
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label">Last Service Date</label>
@@ -2208,6 +2225,13 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <label class="form-label">Installation Date/ Release Date</label>
                                             <input type="date" name="installation_date" class="form-control">
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- Value, Specs & Pictures -->
+                                <div class="aircon-edit-section">
+                                    <h6 class="aircon-edit-section-title"><i class="fas fa-coins me-2"></i>Value, Specs & Pictures</h6>
+                                    <div class="row g-3">
                                         <div class="col-md-3">
                                             <label class="form-label">Energy Efficiency Rating</label>
                                             <input type="text" name="energy_efficient" class="form-control" placeholder="e.g., 5-star, A++">
@@ -2215,10 +2239,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <div class="col-md-3">
                                             <label class="form-label">Power Consumption (kW)</label>
                                             <input type="number" step="0.1" name="power_consumption" class="form-control" placeholder="e.g., 1.5">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label">Notes</label>
-                                            <textarea name="notes" class="form-control" rows="2" placeholder="Any additional information..."></textarea>
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label">Purchase Price (₱)</label>
@@ -2232,7 +2252,11 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <label class="form-label">Lifespan</label>
                                             <input type="text" name="lifespan" class="form-control" placeholder="e.g., 10 years">
                                         </div>
-                                        <div class="col-md-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Notes</label>
+                                            <textarea name="notes" class="form-control" rows="2" placeholder="Any additional information..."></textarea>
+                                        </div>
+                                        <div class="col-md-6">
                                             <label class="form-label">Upload Pictures (Multiple)</label>
                                             <input type="file" name="pictures[]" id="aircon_picture_add" class="form-control" accept="image/*" multiple>
                                             <div id="picture_preview_container_add" class="mt-2" style="display:none;">
@@ -2245,9 +2269,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Item</button>
+                            <div class="modal-footer aircon-edit-footer">
+                                <button type="button" class="btn aircon-btn-ghost" data-bs-dismiss="modal"><i class="fas fa-xmark me-1"></i>Cancel</button>
+                                <button type="submit" class="btn aircon-btn-save"><i class="fas fa-plus me-1"></i>Add Item</button>
                             </div>
                         </form>
                     </div>
@@ -2256,7 +2280,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
             <!-- View Aircon Details Modal -->
             <div class="modal fade" id="viewAirconModal" tabindex="-1">
-                <div class="modal-dialog modal-xl">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header text-white" style="background-color: var(--primary-green);">
                             <h5 class="modal-title">
@@ -2264,268 +2288,238 @@ if ($categories_result && $categories_result->num_rows > 0) {
                             </h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body">
-                            <div class="row g-4">
+                        <div class="modal-body aircon-view-body">
+                            <style>
+                                /* Compact Aircon Unit Details — scoped classes.
+                                   Kept inside .modal-body so printAirconDetails()
+                                   (which copies this markup) inherits them too. */
+                                .aircon-view-hero {
+                                    background: linear-gradient(135deg, var(--primary-green) 0%, #0e5a2e 100%);
+                                    color: #fff;
+                                    border-radius: 12px;
+                                    padding: 14px 16px;
+                                    margin-bottom: 10px;
+                                    -webkit-print-color-adjust: exact;
+                                    print-color-adjust: exact;
+                                }
+                                .aircon-view-brand {
+                                    font-size: 1.4rem;
+                                    font-weight: 700;
+                                    line-height: 1.2;
+                                    word-break: break-word;
+                                }
+                                .aircon-view-sub {
+                                    font-size: 0.92rem;
+                                    opacity: 0.92;
+                                    margin-top: 1px;
+                                }
+                                .aircon-view-itemnum {
+                                    font-size: 0.76rem;
+                                    opacity: 0.75;
+                                    margin-top: 3px;
+                                }
+                                .aircon-view-keyfacts {
+                                    display: grid;
+                                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                                    gap: 6px;
+                                    margin-top: 10px;
+                                }
+                                .aircon-view-keyfact {
+                                    background: rgba(255, 255, 255, 0.12);
+                                    border: 1px solid rgba(255, 255, 255, 0.2);
+                                    border-radius: 8px;
+                                    padding: 6px 10px;
+                                    min-width: 0;
+                                }
+                                .aircon-view-keyfact label {
+                                    display: block;
+                                    font-size: 0.66rem;
+                                    font-weight: 600;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.05em;
+                                    opacity: 0.8;
+                                    margin-bottom: 1px;
+                                }
+                                .aircon-view-keyfact b {
+                                    font-size: 0.85rem;
+                                    word-break: break-word;
+                                }
+                                .aircon-view-status {
+                                    font-size: 0.9rem;
+                                    padding: 0.45em 0.9em;
+                                    border-radius: 8px;
+                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+                                    white-space: nowrap;
+                                }
+                                .aircon-view-card {
+                                    background: #fff;
+                                    border: 1px solid #e5e9e4;
+                                    border-left: 3px solid var(--primary-green);
+                                    border-radius: 10px;
+                                    padding: 10px 12px;
+                                    height: 100%;
+                                    min-width: 0;
+                                }
+                                .aircon-view-card > h6 {
+                                    color: var(--primary-green);
+                                    font-size: 0.72rem;
+                                    font-weight: 700;
+                                    text-transform: uppercase;
+                                    letter-spacing: 0.06em;
+                                    border-bottom: 2px solid #eef1ec;
+                                    padding-bottom: 4px;
+                                    margin-bottom: 8px;
+                                }
+                                .av-row {
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: baseline;
+                                    gap: 10px;
+                                    padding: 3.5px 0;
+                                    border-bottom: 1px dashed #eef1ec;
+                                }
+                                .av-row:last-child {
+                                    border-bottom: none;
+                                }
+                                .av-row label {
+                                    color: #6c757d;
+                                    font-size: 0.78rem;
+                                    margin: 0;
+                                    flex-shrink: 0;
+                                }
+                                .av-row b {
+                                    font-size: 0.82rem;
+                                    text-align: right;
+                                    word-break: break-word;
+                                }
+                                .aircon-view-meta {
+                                    font-size: 0.75rem;
+                                    color: #6c757d;
+                                    margin-top: 8px;
+                                    padding-top: 6px;
+                                    border-top: 1px dashed #eef1ec;
+                                }
+                                .aircon-view-qrimg {
+                                    width: 120px;
+                                    height: 120px;
+                                    object-fit: contain;
+                                    border: 1px solid #dee2e6;
+                                    border-radius: 8px;
+                                    background: #fff;
+                                    padding: 4px;
+                                }
+                                /* Default image placeholder used when an aircon has no uploaded picture. */
+                                .aircon-default-pic {
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    justify-content: center;
+                                    height: 100%;
+                                    min-height: 140px;
+                                    border: 2px dashed #dee2e6;
+                                    border-radius: 10px;
+                                    background: #f8f9fa;
+                                    cursor: default;
+                                    padding: 12px;
+                                    text-align: center;
+                                }
+                                .aircon-default-pic img {
+                                    width: 100px;
+                                    height: 100px;
+                                    object-fit: contain;
+                                    color: var(--primary-green);
+                                }
+                                .aircon-default-caption {
+                                    margin-top: 6px;
+                                    font-size: 0.75rem;
+                                    color: #6c757d;
+                                    max-width: 220px;
+                                }
+                                @media (max-width: 576px) {
+                                    .aircon-view-hero { padding: 12px; }
+                                    .aircon-view-brand { font-size: 1.2rem; }
+                                    .aircon-view-status { font-size: 0.8rem; }
+                                }
+                            </style>
 
-                                <!-- Pictures Section -->
+                            <!-- Highlight strip: the most important facts at a glance -->
+                            <div class="aircon-view-hero">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                    <div style="min-width:0;">
+                                        <div class="aircon-view-brand" id="view_brand">-</div>
+                                        <div class="aircon-view-sub">Model: <span id="view_model">-</span> &middot; Type: <span id="view_type">-</span></div>
+                                        <div class="aircon-view-itemnum"><i class="fas fa-tag me-1"></i>Item No. <span id="view_item_number">-</span> &middot; ID <span id="view_aircon_id">-</span></div>
+                                    </div>
+                                    <span id="view_status" class="badge aircon-view-status bg-secondary">-</span>
+                                </div>
+                                <div class="aircon-view-keyfacts">
+                                    <div class="aircon-view-keyfact"><label>Serial No.</label><b id="view_serial_number">-</b></div>
+                                    <div class="aircon-view-keyfact"><label>Location</label><b id="view_location">-</b></div>
+                                    <div class="aircon-view-keyfact"><label>Area</label><b id="view_area">-</b></div>
+                                    <div class="aircon-view-keyfact"><label>Capacity (BTU/hr)</label><b id="view_capacity">-</b></div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <!-- Dates & Maintenance -->
+                                <div class="col-12 col-md-6">
+                                    <div class="aircon-view-card">
+                                        <h6><i class="fas fa-calendar-alt me-1"></i>Dates & Maintenance</h6>
+                                        <div class="av-row"><label>Purchase Date</label><b id="view_purchase_date">-</b></div>
+                                        <div class="av-row"><label>Warranty Expiry</label><b id="view_warranty_expiry">-</b></div>
+                                        <div class="av-row"><label>Installation / Release</label><b id="view_installation_date">-</b></div>
+                                        <div class="av-row"><label>Last Service</label><b id="view_last_service_date">-</b></div>
+                                        <div class="av-row"><label>Next Maintenance</label><b id="view_maintenance_schedule">-</b></div>
+                                        <div class="av-row"><label>Supplier</label><b id="view_supplier_info">-</b></div>
+                                    </div>
+                                </div>
+
+                                <!-- Value & Specs -->
+                                <div class="col-12 col-md-6">
+                                    <div class="aircon-view-card">
+                                        <h6><i class="fas fa-coins me-1"></i>Value & Specs</h6>
+                                        <div class="av-row"><label>Purchase Price</label><b id="view_purchase_price">-</b></div>
+                                        <div class="av-row"><label>Depreciated Value</label><b id="view_depreciated_value">-</b></div>
+                                        <div class="av-row"><label>Energy Efficiency</label><b id="view_energy_efficiency_rating">-</b></div>
+                                        <div class="av-row"><label>Power Consumption (kW)</label><b id="view_power_consumption">-</b></div>
+                                        <div class="av-row"><label>Lifespan</label><b id="view_lifespan">-</b></div>
+                                    </div>
+                                </div>
+
+                                <!-- Pictures -->
+                                <div class="col-12 col-md-6">
+                                    <div class="aircon-view-card">
+                                        <h6><i class="fas fa-images me-1"></i>Pictures</h6>
+                                        <div id="airconPicturesGallery" class="d-flex flex-wrap gap-2">
+                                            <!-- Images will be loaded dynamically via AJAX -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- QR Code (image streams from the qr_code blob column) -->
+                                <div class="col-12 col-md-6">
+                                    <div class="aircon-view-card">
+                                        <h6><i class="fas fa-qrcode me-1"></i>QR Code</h6>
+                                        <div id="viewQrWrap" class="text-center">
+                                            <div id="viewQrSpinner" class="spinner-border text-success spinner-border-sm" role="status" style="display:none;">
+                                                <span class="visually-hidden">Loading QR...</span>
+                                            </div>
+                                            <img id="viewQrImage" src="" alt="Aircon QR Code" class="aircon-view-qrimg" style="display:none;">
+                                            <div id="viewQrEmpty" class="text-muted small">No QR code stored for this unit yet.</div>
+                                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="viewQrRegenBtn">
+                                                <i class="fas fa-rotate me-1"></i>Generate / Refresh
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Notes + record meta -->
                                 <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-primary text-white">
-                                            <h6 class="mb-0"><i class="fas fa-images me-2"></i>Pictures</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div id="airconPicturesGallery" class="d-flex flex-wrap gap-2">
-                                                <!-- Images will be loaded dynamically via AJAX -->
-                                            </div>
-                                        </div>
-                                    </div>
-
-            <style>
-                /* Default image placeholder used when an aircon has no uploaded picture. */
-                .aircon-default-pic {
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                    height: 100%;
-                    min-height: 180px;
-                    border: 2px dashed #dee2e6;
-                    border-radius: 10px;
-                    background: #f8f9fa;
-                    cursor: default;
-                    padding: 12px;
-                    text-align: center;
-                }
-                .aircon-default-pic img {
-                    width: 120px;
-                    height: 120px;
-                    object-fit: contain;
-                    color: var(--primary-green);
-                }
-                .aircon-default-caption {
-                    margin-top: 6px;
-                    font-size: 0.75rem;
-                    color: #6c757d;
-                    max-width: 220px;
-                }
-            </style>
-
-                                </div>
-
-                                <!-- QR Code Section (image streams from the qr_code blob column) -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header text-white" style="background: linear-gradient(135deg, var(--primary-green), #0e5a2e);">
-                                            <h6 class="mb-0"><i class="fas fa-qrcode me-2"></i>QR Code</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="d-flex flex-wrap align-items-center gap-3">
-                                                <div id="viewQrWrap" class="text-center" style="min-width:170px;">
-                                                    <div id="viewQrSpinner" class="spinner-border text-success" role="status" style="display:none;">
-                                                        <span class="visually-hidden">Loading QR...</span>
-                                                    </div>
-                                                    <img id="viewQrImage" src="" alt="Aircon QR Code"
-                                                         style="display:none;width:160px;height:160px;object-fit:contain;border:1px solid #dee2e6;border-radius:10px;background:#fff;padding:6px;">
-                                                    <div id="viewQrEmpty" class="text-muted small">No QR code stored for this unit yet.</div>
-                                                </div>
-                                                <div class="flex-grow-1">
-                                                    <p class="text-muted small mb-2">Scan this code to identify the unit. The image is served straight from the database blob.</p>
-                                                    <button type="button" class="btn btn-sm btn-outline-success" id="viewQrRegenBtn">
-                                                        <i class="fas fa-rotate me-1"></i>Generate / Refresh QR
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Basic Information Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-primary text-white">
-                                            <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Basic Information</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row g-3">
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Aircon ID</label>
-                                                    <p class="fw-bold mb-0" id="view_aircon_id">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Item Number</label>
-                                                    <p class="fw-bold mb-0" id="view_item_number">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Brand</label>
-                                                    <p class="fw-bold mb-0" id="view_brand">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Model</label>
-                                                    <p class="fw-bold mb-0" id="view_model">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Type</label>
-                                                    <p class="fw-bold mb-0" id="view_type">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Capacity (BTU/hr)</label>
-                                                    <p class="fw-bold mb-0" id="view_capacity">-</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Location & Status Section -->
-                                <div class="col-md-6">
-                                    <div class="card border-0 shadow-sm h-100">
-                                        <div class="card-header bg-success text-white">
-                                            <h6 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Location & Status</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="mb-3">
-                                                <label class="text-muted small">Serial Number</label>
-                                                <p class="fw-bold mb-0" id="view_serial_number">-</p>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted small">Location</label>
-                                                <p class="fw-bold mb-0" id="view_location">-</p>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted small">Area</label>
-                                                <p class="fw-bold mb-0" id="view_area">-</p>
-                                            </div>
-                                            <div class="mb-0">
-                                                <label class="text-muted small">Status</label>
-                                                <p class="fw-bold mb-0" id="view_status">-</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Dates Section -->
-                                <div class="col-md-6">
-                                    <div class="card border-0 shadow-sm h-100">
-                                        <div class="card-header bg-warning text-dark">
-                                            <h6 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Important Dates</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="mb-3">
-                                                <label class="text-muted small">Purchase Date</label>
-                                                <p class="fw-bold mb-0" id="view_purchase_date">-</p>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="text-muted small">Warranty Expiry</label>
-                                                <p class="fw-bold mb-0" id="view_warranty_expiry">-</p>
-                                            </div>
-                                            <div class="mb-0">
-                                                <label class="text-muted small">Installation Date/ Release Date</label>
-                                                <p class="fw-bold mb-0" id="view_installation_date">-</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Maintenance Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-info text-white">
-                                            <h6 class="mb-0"><i class="fas fa-tools me-2"></i>Maintenance Information</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row g-3">
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Last Service Date</label>
-                                                    <p class="fw-bold mb-0" id="view_last_service_date">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Maintenance Schedule</label>
-                                                    <p class="fw-bold mb-0" id="view_maintenance_schedule">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Supplier Info</label>
-                                                    <p class="fw-bold mb-0" id="view_supplier_info">-</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Technical Specifications Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-secondary text-white">
-                                            <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Technical Specifications</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="text-muted small">Energy Efficiency Rating</label>
-                                                    <p class="fw-bold mb-0" id="view_energy_efficiency_rating">-</p>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="text-muted small">Power Consumption (kW)</label>
-                                                    <p class="fw-bold mb-0" id="view_power_consumption">-</p>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="text-muted small">Lifespan</label>
-                                                    <p class="fw-bold mb-0" id="view_lifespan">-</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Financial Information Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header bg-dark text-white">
-                                            <h6 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Financial Information</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row g-3">
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Purchase Price</label>
-                                                    <p class="fw-bold mb-0" id="view_purchase_price">-</p>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="text-muted small">Depreciated Value</label>
-                                                    <p class="fw-bold mb-0" id="view_depreciated_value">-</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Notes Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header" style="background-color: #6c757d; color: white;">
-                                            <h6 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notes</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <p class="mb-0" id="view_notes">-</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Record Information Section -->
-                                <div class="col-12">
-                                    <div class="card border-0 shadow-sm">
-                                        <div class="card-header" style="background-color: #5a6268; color: white;">
-                                            <h6 class="mb-0"><i class="fas fa-database me-2"></i>Record Information</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="row g-3">
-                                                <div class="col-md-6">
-                                                    <label class="text-muted small">Created By</label>
-                                                    <p class="fw-bold mb-0" id="view_created_by">-</p>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="text-muted small">Date Created</label>
-                                                    <p class="fw-bold mb-0" id="view_date_created">-</p>
-                                                </div>
-                                            </div>
+                                    <div class="aircon-view-card">
+                                        <h6><i class="fas fa-sticky-note me-1"></i>Notes</h6>
+                                        <p class="mb-0" id="view_notes" style="font-size:0.85rem;">-</p>
+                                        <div class="aircon-view-meta">
+                                            <i class="fas fa-database me-1"></i>Created by <b id="view_created_by">-</b> &middot; <span id="view_date_created">-</span>
                                         </div>
                                     </div>
                                 </div>
@@ -4062,7 +4056,22 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     document.getElementById('view_serial_number').textContent = serialNumber || 'N/A';
                     document.getElementById('view_location').textContent = location || 'N/A';
                     document.getElementById('view_area').textContent = area || 'N/A';
-                    document.getElementById('view_status').textContent = status || 'N/A';
+                    // Status badge with color coding by condition
+                    var statusBadge = document.getElementById('view_status');
+                    statusBadge.textContent = status || 'N/A';
+                    var statusNorm = (status || '').toLowerCase().trim();
+                    var statusColors = {
+                        'working': 'success',
+                        'operational': 'success',
+                        'needs repair': 'warning text-dark',
+                        'needs attention': 'warning text-dark',
+                        'under maintenance': 'info',
+                        'replace': 'danger',
+                        'decommissioned': 'danger',
+                        'not applicable': 'secondary',
+                        'n/a': 'secondary'
+                    };
+                    statusBadge.className = 'badge aircon-view-status bg-' + (statusColors[statusNorm] || 'danger');
 
                     // Format dates
                     document.getElementById('view_purchase_date').textContent = purchaseDate ? formatDate(purchaseDate) : 'N/A';
