@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $brand = trim($_POST['brand'] ?? '');
     $model = trim($_POST['model'] ?? '');
     $type = trim($_POST['type'] ?? '');
-    $capacity = trim($_POST['capacity'] ?? '');
+    $horse_power = trim($_POST['horse_power'] ?? '');
     $serial_number = trim($_POST['serial_number'] ?? '');
     $location = trim($_POST['location'] ?? '');
     $area = trim($_POST['area'] ?? '');
@@ -65,9 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         category,
         brand, 
         model, 
-        type, 
-        capacity, 
-        serial_number, 
+        type,
+        horse_power,
+        serial_number,
         location, 
         area,
         status, 
@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $brand,
         $model,
         $type,
-        $capacity,
+        $horse_power,
         $serial_number,
         $location,
         $area,
