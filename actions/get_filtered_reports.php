@@ -290,7 +290,7 @@ if ($report_type === 'aircon') {
                 <th>Brand</th>
                 <th>Model</th>
                 <th>Type</th>
-                <th>Capacity</th>
+                <th>Horse Power</th>
                 <th>Serial No.</th>
                 <th>Location</th>
                 <th>Status</th>
@@ -309,7 +309,7 @@ if ($report_type === 'aircon') {
                 <td><?= htmlspecialchars($row['brand'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['model'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['type'] ?? '—') ?></td>
-                <td><?= htmlspecialchars($row['capacity'] ?? '—') ?></td>
+                <td><?= htmlspecialchars($row['horse_power'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['serial_number'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['location'] ?? '—') ?></td>
                 <td><span class="<?= $badge ?>"><?= htmlspecialchars($row['status']) ?></span></td>
