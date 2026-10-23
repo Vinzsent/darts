@@ -4,10 +4,13 @@
  * Stream one AIRCON unit's QR code as a PNG image.
  *
  * Usage: view_aircon_qr.php?id=<aircon_id>[&regen=1]
- *   - Reads the stored qr_code BLOB from `aircons` (written on add/edit).
- *   - If none exists yet (or &regen=1), generates it on the fly with the
+ *   - The QR is ALWAYS generated fresh from the live `aircons` row with the
  *     bundled encoder (includes/qrcode.php), encoding a compact JSON payload
- *     of the unit's identity + key specs, and persists it for next time.
+ *     of the unit's identity + key specs — so details shown by a scan are
+ *     never stale. (&regen=1 is accepted for compatibility but is now
+ *     redundant: every request regenerates.)
+ *   - The qr_code column keeps its short code (e.g. AC-006) as a legacy
+ *     scan identifier only; it is no longer used to render the image.
  */
 session_start();
 require_once __DIR__ . '/../includes/db.php';
@@ -27,7 +30,7 @@ if ($id <= 0) {
 function buildAirconQrPng($conn, $id)
 {
     $stmt = $conn->prepare(
-        "SELECT aircon_id, item_number, brand, model, type, capacity, serial_number,
+        "SELECT aircon_id, item_number, brand, model, type, horse_power, serial_number,
                 location, area, status, campus, lifespan
          FROM aircons WHERE aircon_id = ? LIMIT 1"
     );
@@ -56,37 +59,15 @@ function buildAirconQrPng($conn, $id)
     return $qr->toPng(6, 4);
 }
 
-// Try the stored value first (unless a regen was requested).
+// Always generate from the live row so the QR payload reflects the
+// current details (brand, model, location, status, ...) at scan time.
+// The stored qr_code text (e.g. AC-006) remains in the DB purely as a
+// legacy scan identifier and is no longer used to render the image.
 $png = null;
-if (!$regen) {
-    $stmt = $conn->prepare("SELECT qr_code FROM aircons WHERE aircon_id = ? LIMIT 1");
-    if ($stmt) {
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        $stmt->bind_result($val);
-        if ($stmt->fetch() && $val !== null && $val !== '') {
-            if (strpos($val, "\x89PNG") === 0) {
-                $png = $val;
-            } else {
-                try {
-                    $qr = new QrCode($val, QrCode::ECC_MEDIUM);
-                    $png = $qr->toPng(6, 4);
-                } catch (Throwable $e) {
-                    $png = null;
-                }
-            }
-        }
-        $stmt->close();
-    }
-}
-
-// Fall back to generating on the fly.
-if ($png === null) {
-    try {
-        $png = buildAirconQrPng($conn, $id);
-    } catch (Throwable $e) {
-        $png = null;
-    }
+try {
+    $png = buildAirconQrPng($conn, $id);
+} catch (Throwable $e) {
+    $png = null;
 }
 
 if ($png === null) {
