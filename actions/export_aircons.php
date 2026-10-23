@@ -73,7 +73,7 @@ if ($status_raw !== '') {
 
 $inv_where = !empty($inv_where_conditions) ? ' WHERE ' . implode(' AND ', $inv_where_conditions) : '';
 
-$sql = "SELECT i.item_number, i.campus, i.brand, i.model, i.type, i.capacity, i.serial_number, i.location, i.status,
+$sql = "SELECT i.item_number, i.campus, i.brand, i.model, i.type, i.horse_power, i.serial_number, i.location, i.status,
                i.purchase_date, i.warranty_expiry, i.last_service_date, i.maintenance_schedule, i.installation_date,
                i.energy_efficiency_rating, i.power_consumption, i.purchase_price, i.depreciated_value, s.supplier_name, i.date_created
         FROM aircons i
@@ -94,7 +94,7 @@ echo "\xEF\xBB\xBF";
 
 $out = fopen('php://output', 'w');
 fputcsv($out, [
-    'Item Number', 'Campus', 'Brand', 'Model', 'Type', 'Capacity', 'Serial Number', 'Location', 'Status',
+    'Item Number', 'Campus', 'Brand', 'Model', 'Type', 'Horse Power', 'Serial Number', 'Location', 'Status',
     'Purchase Date', 'Warranty Expiry', 'Last Service Date', 'Maintenance Schedule', 'Installation Date',
     'Energy Efficiency', 'Power Consumption', 'Purchase Price', 'Depreciated Value', 'Supplier', 'Date Created'
 ]);
@@ -107,7 +107,7 @@ if ($result) {
             $row['brand'],
             $row['model'],
             $row['type'],
-            $row['capacity'],
+            $row['horse_power'],
             $row['serial_number'],
             $row['location'],
             $row['status'],
