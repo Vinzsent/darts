@@ -15,7 +15,7 @@ $category             = trim($_POST['category'] ?? '');
 $brand                = trim($_POST['brand'] ?? '');
 $model                = trim($_POST['model'] ?? '');
 $type                 = trim($_POST['type'] ?? '');
-$capacity             = trim($_POST['capacity'] ?? '');
+$horse_power          = trim($_POST['horse_power'] ?? '');
 $serial_number        = trim($_POST['serial_number'] ?? '');
 $location             = trim($_POST['location'] ?? '');
 $area                 = trim($_POST['area'] ?? '');
@@ -95,7 +95,7 @@ $update_sql = "UPDATE aircons
                    brand = ?, 
                    model = ?, 
                    type = ?, 
-                   capacity = ?,
+                   horse_power = ?,
                    serial_number = ?, 
                    location = ?, 
                    area = ?, 
@@ -131,7 +131,7 @@ $params = [
     $brand,
     $model,
     $type,
-    $capacity,
+    $horse_power,
     $serial_number,
     $location,
     $area,
