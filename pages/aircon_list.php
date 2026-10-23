@@ -104,7 +104,7 @@ if ($campus_raw === 'BED' || $campus_raw === 'TED') {
     $inv_where_conditions[] = "TRIM(UPPER(i.campus)) = '$campus_esc'";
 }
 // Add status filter if provided (case-insensitive match)
-$allowed_statuses = ['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
+$allowed_statuses = ['Working', 'Replace', 'Needs Repair', 'Needs Attention', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
 if ($status_raw !== '' && in_array($status_raw, $allowed_statuses, true)) {
     $status_esc = $conn->real_escape_string($status_raw);
     $inv_where_conditions[] = "LOWER(TRIM(i.status)) = LOWER('$status_esc')";
@@ -182,26 +182,28 @@ $status_sql = "SELECT status, COUNT(*) as count FROM aircons" . $campus_clause .
 $status_result = $conn->query($status_sql);
 if ($status_result) {
     while ($row = $status_result->fetch_assoc()) {
-        $status = $row['status'];
+        $status = (string)($row['status'] ?? '');
         $count = (int)$row['count'];
 
-        switch ($status) {
-            case 'Operational':
+        switch (strtolower(trim($status))) {
+            case 'operational':
                 $operational_count = $count;
                 break;
-            case 'Working':
+            case 'working':
                 $working_count = $count;
                 break;
-            case 'Needs Repair':
+            case 'needs repair':
+            case 'needs attention':
                 $needs_repair_count = $count;
                 break;
-            case 'Under Maintenance':
+            case 'under maintenance':
                 $under_maintenance_count = $count;
                 break;
-            case 'Decommissioned':
+            case 'decommissioned':
                 $decommissioned_count = $count;
                 break;
-            case 'N/A':
+            case 'n/a':
+            case 'not applicable':
                 $na_count = $count;
                 break;
         }
@@ -216,6 +218,7 @@ $attention_needed_count = $needs_repair_count + $under_maintenance_count; // Nee
 $good_condition_aircons = [];
 $needs_attention_aircons = [];
 $decommissioned_aircons = [];
+$not_applicable_aircons = [];
 
 // Get good condition aircons (Operational + Working)
 $good_sql = "SELECT * FROM aircons WHERE status IN ('Operational', 'Working')"
@@ -229,7 +232,7 @@ if ($good_result) {
 }
 
 // Get aircons needing attention (Needs Repair + Under Maintenance)
-$attention_sql = "SELECT * FROM aircons WHERE status IN ('Needs Repair', 'Under Maintenance')"
+$attention_sql = "SELECT * FROM aircons WHERE status IN ('Needs Repair', 'Needs Attention', 'Under Maintenance')"
     . ($campus_clause ? str_replace(' WHERE ', ' AND ', $campus_clause) : '')
     . " ORDER BY location, brand";
 $attention_result = $conn->query($attention_sql);
@@ -247,6 +250,17 @@ $decom_result = $conn->query($decom_sql);
 if ($decom_result) {
     while ($row = $decom_result->fetch_assoc()) {
         $decommissioned_aircons[] = $row;
+    }
+}
+
+// Get Not Applicable aircons ('Not Applicable' or legacy 'N/A')
+$na_aircons_sql = "SELECT * FROM aircons WHERE LOWER(TRIM(status)) IN ('not applicable', 'n/a')"
+    . ($campus_clause ? str_replace(' WHERE ', ' AND ', $campus_clause) : '')
+    . " ORDER BY location, brand";
+$na_aircons_result = $conn->query($na_aircons_sql);
+if ($na_aircons_result) {
+    while ($row = $na_aircons_result->fetch_assoc()) {
+        $not_applicable_aircons[] = $row;
     }
 }
 
@@ -1026,6 +1040,15 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 <div class="stat-label">Decommissioned</div>
                 <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
             </div>
+
+            <div class="stat-card clickable" style="border-left: 4px solid #6c757d; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#notApplicableModal" title="Click to view Not Applicable aircons">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <div class="stat-number" style="color: #6c757d;"><?= $na_count ?></div>
+                <div class="stat-label">Not Applicable</div>
+                <small class="text-muted mt-1"><i class="fas fa-eye"></i> Click to view details</small>
+            </div>
         </div>
 
 
@@ -1473,6 +1496,101 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 </div>
             </div>
         </div>
+
+        <!-- Not Applicable Aircons Modal -->
+        <div class="modal fade" id="notApplicableModal" tabindex="-1" aria-labelledby="notApplicableModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white;">
+                        <h5 class="modal-title" id="notApplicableModalLabel">
+                            <i class="fas fa-ban me-2"></i>Not Applicable Aircons
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php if (!empty($not_applicable_aircons)): ?>
+                            <div class="alert alert-secondary">
+                                <i class="fas fa-ban me-2"></i>
+                                <strong><?= count($not_applicable_aircons) ?></strong> aircon unit(s) are marked as Not Applicable.
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped">
+                                    <thead class="table-secondary">
+                                        <tr>
+                                            <th>Brand</th>
+                                            <th>Model</th>
+                                            <th>Type</th>
+                                            <th>Location</th>
+                                            <th>Status</th>
+                                            <th>Serial No.</th>
+                                            <th>Last Service</th>
+                                            <?php if ($can_manage_aircon): ?><th>Actions</th><?php endif; ?>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($not_applicable_aircons as $aircon): ?>
+                                            <tr>
+                                                <td><strong><?= htmlspecialchars($aircon['brand'] ?? 'N/A') ?></strong></td>
+                                                <td><?= htmlspecialchars($aircon['model'] ?? 'N/A') ?></td>
+                                                <td><?= htmlspecialchars($aircon['type'] ?? 'N/A') ?></td>
+                                                <td><?= htmlspecialchars($aircon['location'] ?? 'N/A') ?></td>
+                                                <td><span class="badge bg-secondary"><?= htmlspecialchars($aircon['status']) ?></span></td>
+                                                <td><?= htmlspecialchars($aircon['serial_number'] ?? 'N/A') ?></td>
+                                                <td><?= !empty($aircon['last_service_date']) ? date('M d, Y', strtotime($aircon['last_service_date'])) : 'N/A' ?></td>
+                                                <?php if ($can_manage_aircon): ?>
+                                                    <td>
+                                                        <button class="btn btn-sm btn-primary view-aircon-details-btn"
+                                                            title="View Details"
+                                                            data-aircon-id="<?= (int)$aircon['aircon_id'] ?>"
+                                                            data-item-number="<?= htmlspecialchars($aircon['item_number'] ?? '', ENT_QUOTES) ?>"
+                                                            data-brand="<?= htmlspecialchars($aircon['brand'] ?? '', ENT_QUOTES) ?>"
+                                                            data-model="<?= htmlspecialchars($aircon['model'] ?? '', ENT_QUOTES) ?>"
+                                                            data-type="<?= htmlspecialchars($aircon['type'] ?? '', ENT_QUOTES) ?>"
+                                                            data-capacity="<?= htmlspecialchars($aircon['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                            data-serial-number="<?= htmlspecialchars($aircon['serial_number'] ?? '', ENT_QUOTES) ?>"
+                                                            data-location="<?= htmlspecialchars($aircon['location'] ?? '', ENT_QUOTES) ?>"
+                                                            data-status="<?= htmlspecialchars($aircon['status'] ?? '', ENT_QUOTES) ?>"
+                                                            data-purchase-date="<?= htmlspecialchars($aircon['purchase_date'] ?? '', ENT_QUOTES) ?>"
+                                                            data-warranty-expiry="<?= htmlspecialchars($aircon['warranty_expiry'] ?? '', ENT_QUOTES) ?>"
+                                                            data-last-service-date="<?= htmlspecialchars($aircon['last_service_date'] ?? '', ENT_QUOTES) ?>"
+                                                            data-maintenance-schedule="<?= htmlspecialchars($aircon['maintenance_schedule'] ?? '', ENT_QUOTES) ?>"
+                                                            data-supplier-info="<?= htmlspecialchars($aircon['supplier_name'] ?? '', ENT_QUOTES) ?>"
+                                                            data-installation-date="<?= htmlspecialchars($aircon['installation_date'] ?? '', ENT_QUOTES) ?>"
+                                                            data-energy-efficiency="<?= htmlspecialchars($aircon['energy_efficiency_rating'] ?? '', ENT_QUOTES) ?>"
+                                                            data-power-consumption="<?= htmlspecialchars($aircon['power_consumption'] ?? '', ENT_QUOTES) ?>"
+                                                            data-notes="<?= htmlspecialchars($aircon['notes'] ?? '', ENT_QUOTES) ?>"
+                                                            data-purchase-price="<?= htmlspecialchars($aircon['purchase_price'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-depreciated-value="<?= htmlspecialchars($aircon['depreciated_value'] ?? '0', ENT_QUOTES) ?>"
+                                                            data-lifespan="<?= htmlspecialchars($aircon['lifespan'] ?? '', ENT_QUOTES) ?>"
+                                                            data-area="<?= htmlspecialchars($aircon['area'] ?? '', ENT_QUOTES) ?>"
+                                                            data-receiver="<?= htmlspecialchars($aircon['receiver'] ?? '', ENT_QUOTES) ?>"
+                                                            data-created-by="<?= htmlspecialchars($aircon['created_by'] ?? '', ENT_QUOTES) ?>"
+                                                            data-date-created="<?= htmlspecialchars($aircon['date_created'] ?? '', ENT_QUOTES) ?>"
+                                                            data-picture="<?= htmlspecialchars($aircon['picture'] ?? '', ENT_QUOTES) ?>"
+                                                            data-modal-id="notApplicableModal">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                    </td>
+                                                <?php endif; ?>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-5">
+                                <i class="fas fa-ban fa-4x text-muted mb-3"></i>
+                                <h4>No Aircons</h4>
+                                <p class="text-muted">No aircons are marked as Not Applicable.</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <style>
             /* Responsive table styles */
             .table-responsive {
@@ -1665,7 +1783,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         <label for="status" class="form-label mb-0 text-white">Status</label>
                         <select id="status" name="status" class="form-select form-select-sm">
                             <option value="">All</option>
-                            <?php foreach (['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'] as $st): ?>
+                            <?php foreach (['Working', 'Replace', 'Needs Repair', 'Needs Attention', 'Under Maintenance', 'Decommissioned', 'Not Applicable'] as $st): ?>
                                 <option value="<?= htmlspecialchars($st) ?>" <?= ($status_raw === $st) ? 'selected' : '' ?>><?= htmlspecialchars($st) ?></option>
                             <?php endforeach; ?>
                         </select>
@@ -1697,12 +1815,15 @@ if ($categories_result && $categories_result->num_rows > 0) {
             $total_pages = ceil($total_records / $records_per_page);
 
             // Get inventory data with pagination (respect filters and join supplier)
+            // Sort by most recently touched first (date_updated on edit,
+            // falling back to date_created) so an edited unit always appears
+            // as the top row of page 1 after a successful save.
             $sql = "SELECT i.*, s.supplier_name, 
                            (SELECT image_path FROM aircon_images WHERE aircon_id = i.aircon_id ORDER BY id ASC LIMIT 1) as first_image 
                     FROM aircons i 
                     LEFT JOIN supplier s ON i.supplier_id = s.supplier_id 
                     $inv_where
-                    ORDER BY i.installation_date DESC, i.date_created DESC
+                    ORDER BY COALESCE(i.date_updated, i.date_created) DESC, i.installation_date DESC, i.date_created DESC
                     LIMIT $records_per_page OFFSET $offset";
             $result = $conn->query($sql);
             ?>
@@ -1748,7 +1869,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td data-label="Status">
                                             <span class="badge bg-<?= match (strtolower(trim($row['status'] ?? ''))) {
                                                                         'working' => 'success',
-                                                                        'needs repair', 'not applicable', 'n/a' => 'warning text-dark',
+                                                                        'needs repair', 'needs attention', 'not applicable', 'n/a' => 'warning text-dark',
                                                                         'replace', 'decommissioned' => 'danger',
                                                                         'under maintenance' => 'info',
                                                                         default => 'danger'
@@ -4268,7 +4389,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                 $inv_where_conditions_ajax[] = "TRIM(UPPER(pi.campus)) = '$campus_esc_ajax'";
             }
             // Status filter for AJAX (case-insensitive match)
-            $allowed_statuses_ajax = ['Working', 'Replace', 'Needs Repair', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
+            $allowed_statuses_ajax = ['Working', 'Replace', 'Needs Repair', 'Needs Attention', 'Under Maintenance', 'Decommissioned', 'Not Applicable'];
             if ($status_raw_ajax !== '' && in_array($status_raw_ajax, $allowed_statuses_ajax, true)) {
                 $status_esc_ajax = $conn->real_escape_string($status_raw_ajax);
                 $inv_where_conditions_ajax[] = "LOWER(TRIM(pi.status)) = LOWER('$status_esc_ajax')";
@@ -4283,11 +4404,13 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
             $total_pages = ceil($total_records / $records_per_page);
 
             // Get inventory data with pagination
+            // Same "most recently touched first" order as the static table
+            // so AJAX page loads / searches stay consistent.
             $sql = "SELECT pi.*, s.supplier_name 
                     FROM aircons pi 
                     LEFT JOIN supplier s ON pi.supplier_id = s.supplier_id 
                     $inv_where_ajax
-                    ORDER BY pi.installation_date DESC, pi.date_created DESC
+                    ORDER BY COALESCE(pi.date_updated, pi.date_created) DESC, pi.installation_date DESC, pi.date_created DESC
                     LIMIT $records_per_page OFFSET $offset";
             $result = $conn->query($sql);
 
@@ -4318,7 +4441,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                 while ($row = $result->fetch_assoc()) {
                     $status_class = match (strtolower(trim($row['status'] ?? ''))) {
                         'working' => 'success',
-                        'needs repair', 'not applicable', 'n/a' => 'warning text-dark',
+                        'needs repair', 'needs attention', 'not applicable', 'n/a' => 'warning text-dark',
                         'under maintenance' => 'info',
                         'decommissioned', 'replace' => 'danger',
                         default => 'danger'
@@ -4743,6 +4866,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                                             <option value="Working">Working</option>
                                             <option value="Replace">Replace</option>
                                             <option value="Needs Repair">Needs Repair</option>
+                                            <option value="Needs Attention">Needs Attention</option>
                                             <option value="Under Maintenance">Under Maintenance</option>
                                             <option value="Decommissioned">Decommissioned</option>
                                             <option value="Not Applicable">Not Applicable</option>
@@ -4873,6 +4997,25 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                margins keep it responsive on smaller viewports. */
             .aircon-edit-dialog {
                 max-width: 1000px;
+            }
+            /* Scrollable edit modal: the <form> wraps .modal-body and
+               .modal-footer, which breaks Bootstrap's modal-dialog-scrollable
+               chain (the footer was pushed out of the clipped content and the
+               Save button was unreachable). Making the form a flex column
+               restores it: the body scrolls, the footer stays pinned. */
+            .aircon-edit-modal form {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                overflow: hidden;
+            }
+            .aircon-edit-modal form .modal-body.aircon-edit-body {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+            }
+            .aircon-edit-modal form .modal-footer.aircon-edit-footer {
+                flex-shrink: 0;
             }
             .aircon-edit-subtitle {
                 color: rgba(255, 255, 255, 0.75);
