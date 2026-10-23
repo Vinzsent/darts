@@ -4295,7 +4295,30 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 }
 
                 // Print all aircon QR codes with their unique codes
+                var printAllQrWindow = null;
+
                 function printAllAirconQr() {
+                    // Step 0: Open the print window SYNCHRONOUSLY inside the user's
+                    // click gesture. Opening it after the async QR fetches below gets
+                    // blocked by popup blockers (window.open returns null), which made
+                    // renderAllQrPrint crash with "Cannot read properties of null".
+                    printAllQrWindow = window.open('', 'airconQrPrint', 'height=800,width=1200');
+                    if (!printAllQrWindow) {
+                        alert('The print window was blocked by your browser.\nPlease allow pop-ups for this site and try again.');
+                        return;
+                    }
+                    try {
+                        printAllQrWindow.document.write('<html><head><title>Print All Aircon QR Codes</title>');
+                        printAllQrWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
+                        printAllQrWindow.document.write('<style>body { padding: 20px; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; } h1 { text-align: center; color: #073b1d; margin-bottom: 30px; } .qr-print-item { page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center; background:#fff; } .qr-print-item img { width:120px; height:120px; object-fit:contain; border:1px solid #dee2e6; border-radius:6px; background:#fff; padding:6px; } .print-header { text-align:center; margin-bottom:30px; } @media print { body { padding: 0; } .no-print { display:none; } }</style></head><body>');
+                        printAllQrWindow.document.write('<div class="print-header"><h1><i class="fas fa-qrcode me-2"></i>Aircon QR Code Labels</h1><p class="text-muted" id="qr-progress">Preparing… please keep this window open.</p></div>');
+                        printAllQrWindow.document.write('<div class="qr-print-grid" id="qr-print-grid"></div>');
+                        printAllQrWindow.document.write('</body></html>');
+                        printAllQrWindow.document.close();
+                    } catch (e) {
+                        console.error('Print window write error:', e);
+                    }
+
                     // Step 1: Fetch ALL aircon records (ignoring pagination/filters) via AJAX
                     fetch('aircon_list.php?ajax=1&print_all_qr=1&t=' + Date.now(), { credentials: 'same-origin' })
                         .then(function(response) {
@@ -4308,6 +4331,15 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 return;
                             }
                             var qrItems = [], pending = 0;
+                            var totalQr = aircons.length;
+                            var updateProgress = function() {
+                                try {
+                                    if (printAllQrWindow && !printAllQrWindow.closed) {
+                                        var el = printAllQrWindow.document.getElementById('qr-progress');
+                                        if (el) el.textContent = 'Loaded ' + (totalQr - pending) + ' of ' + totalQr + ' QR codes…';
+                                    }
+                                } catch (e) { /* window navigated away */ }
+                            };
                             aircons.forEach(function(ac) {
                                 var airconId = ac.id;
                                 var itemNum = ac.item_number || '';
@@ -4323,9 +4355,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     .then(function(blob) {
                                         qrItems.push({ id: airconId, code: displayCode, brand: brand, model: model, campus: campus, location: location, imgUrl: URL.createObjectURL(blob) });
                                         pending--;
+                                        updateProgress();
                                         if (pending === 0) renderAllQrPrint(qrItems);
                                     })
-                                    .catch(function(err) { console.error('QR fetch error for ' + airconId + ':', err); pending--; if (pending === 0) renderAllQrPrint(qrItems); });
+                                    .catch(function(err) { console.error('QR fetch error for ' + airconId + ':', err); pending--; updateProgress(); if (pending === 0) renderAllQrPrint(qrItems); });
                             });
                         })
                         .catch(function(err) {
@@ -4335,23 +4368,36 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 }
 
                 function renderAllQrPrint(items) {
-                    if (items.length === 0) { alert('No QR codes could be loaded.'); return; }
+                    var printWindow = printAllQrWindow;
+                    if (!printWindow || printWindow.closed) {
+                        alert('The print window was closed before the QR codes were ready. Please try again.');
+                        return;
+                    }
+                    if (items.length === 0) {
+                        alert('No QR codes could be loaded.');
+                        return;
+                    }
                     items.sort(function(a, b) { return parseInt(a.id) - parseInt(b.id); });
                     var printHtml = '';
                     items.forEach(function(item) {
                         printHtml += '<div class="qr-print-item" style="page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center;"><img src="' + item.imgUrl + '" alt="QR Code" style="width:120px;height:120px;object-fit:contain;border:1px solid #dee2e6;border-radius:6px;background:#fff;padding:6px;"><div class="mt-3"><div><strong style="font-size:0.9rem;">Aircon #</strong> <span style="font-size:1.1rem; color:#073b1d;">' + item.id + '</span></div><div><small class="text-muted d-block">Code:</small> <strong style="font-size:0.85rem; word-break:break-all;">' + escapeHtmlQr(item.code) + '</strong></div><div><small class="text-muted d-block">Brand / Model:</small> <span style="font-size:0.8rem;">' + escapeHtmlQr(item.brand) + ' / ' + escapeHtmlQr(item.model) + '</span></div><div><small class="text-muted d-block">Campus / Location:</small> <span style="font-size:0.8rem;">' + escapeHtmlQr(item.campus) + ' / ' + escapeHtmlQr(item.location) + '</span></div></div></div>';
                     });
-                    var printWindow = window.open('', '', 'height=800,width=1200');
-                    printWindow.document.write('<html><head><title>Print All Aircon QR Codes</title>');
-                    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
-                    printWindow.document.write('<style>body { padding: 20px; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; } h1 { text-align: center; color: #073b1d; margin-bottom: 30px; } .qr-print-item { page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center; background:#fff; } .qr-print-item img { width:120px; height:120px; object-fit:contain; border:1px solid #dee2e6; border-radius:6px; background:#fff; padding:6px; } .print-header { text-align:center; margin-bottom:30px; } @media print { body { padding: 0; } .no-print { display:none; } }</style></head><body>');
-                    printWindow.document.write('<div class="print-header"><h1><i class="fas fa-qrcode me-2"></i>Aircon QR Code Labels</h1><p class="text-muted">Total: ' + items.length + ' unit(s) | Printed: ' + new Date().toLocaleString() + '</p></div>');
-                    printWindow.document.write('<div class="qr-print-grid">' + printHtml + '</div>');
-                    printWindow.document.write('<div class="text-center mt-4 no-print"><button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-1"></i> Print</button><button class="btn btn-secondary ms-2" onclick="window.close()"><i class="fas fa-times me-1"></i> Close</button></div>');
-                    printWindow.document.write('</body></html>');
-                    printWindow.document.close();
-                    printWindow.focus();
-                    setTimeout(function() { printWindow.print(); }, 500);
+                    try {
+                        printWindow.document.open();
+                        printWindow.document.write('<html><head><title>Print All Aircon QR Codes</title>');
+                        printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">');
+                        printWindow.document.write('<style>body { padding: 20px; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; } h1 { text-align: center; color: #073b1d; margin-bottom: 30px; } .qr-print-item { page-break-inside:avoid; margin-bottom:20px; border:1px solid #dee2e6; border-radius:8px; padding:15px; display:inline-block; width:240px; vertical-align:top; text-align:center; background:#fff; } .qr-print-item img { width:120px; height:120px; object-fit:contain; border:1px solid #dee2e6; border-radius:6px; background:#fff; padding:6px; } .print-header { text-align:center; margin-bottom:30px; } @media print { body { padding: 0; } .no-print { display:none; } }</style></head><body>');
+                        printWindow.document.write('<div class="print-header"><h1><i class="fas fa-qrcode me-2"></i>Aircon QR Code Labels</h1><p class="text-muted">Total: ' + items.length + ' unit(s) | Printed: ' + new Date().toLocaleString() + '</p></div>');
+                        printWindow.document.write('<div class="qr-print-grid">' + printHtml + '</div>');
+                        printWindow.document.write('<div class="text-center mt-4 no-print"><button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print me-1"></i> Print</button><button class="btn btn-secondary ms-2" onclick="window.close()"><i class="fas fa-times me-1"></i> Close</button></div>');
+                        printWindow.document.write('</body></html>');
+                        printWindow.document.close();
+                        printWindow.focus();
+                        setTimeout(function() { try { printWindow.print(); } catch (e) {} }, 500);
+                    } catch (e) {
+                        console.error('Print render error:', e);
+                        alert('Could not render the print window. Please allow pop-ups for this site and try again.');
+                    }
                 }
             </script>
         <?php endif; ?>
