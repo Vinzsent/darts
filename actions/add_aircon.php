@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $capacity = trim($_POST['capacity'] ?? '');
     $serial_number = trim($_POST['serial_number'] ?? '');
     $location = trim($_POST['location'] ?? '');
+    $area = trim($_POST['area'] ?? '');
     $status = trim($_POST['status'] ?? 'Working');
     $purchase_date = !empty($_POST['purchase_date']) ? $_POST['purchase_date'] : null;
     $warranty_expiry = !empty($_POST['warranty_expiry']) ? $_POST['warranty_expiry'] : null;
@@ -68,6 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         capacity, 
         serial_number, 
         location, 
+        area,
         status, 
         purchase_date, 
         warranty_expiry, 
@@ -85,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         date_created,
         campus,
         lifespan
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)";
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)";
 
     $stmt = $conn->prepare($sql);
 
@@ -95,9 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         exit();
     }
 
-    // Bind parameters - 24 parameters (order must match the columns above)
+    // Bind parameters - 25 parameters (order must match the columns above)
     $stmt->bind_param(
-        "sssssssssssssssdsddsiiss",
+        "ssssssssssssssssdsddsiiss",
         $item_name,
         $category,
         $brand,
@@ -106,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $capacity,
         $serial_number,
         $location,
+        $area,
         $status,
         $purchase_date,
         $warranty_expiry,
