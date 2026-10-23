@@ -63,7 +63,7 @@ $itemData = null;
 
 // 1. Search AIRCONS
 if ($targetType === null || $targetType === 'AIRCON_UNIT') {
-    $sql = "SELECT aircon_id, item_number, brand, model, type, capacity, serial_number, location, area, status, campus, lifespan, date_created, date_updated, qr_code FROM aircons WHERE ";
+    $sql = "SELECT aircon_id, item_number, brand, model, type, horse_power, serial_number, location, area, status, campus, lifespan, date_created, date_updated, qr_code FROM aircons WHERE ";
     if ($searchId > 0) {
         $sql .= "aircon_id = ? OR qr_code = ? OR item_number = ? OR serial_number = ? LIMIT 1";
         $stmt = $conn->prepare($sql);
