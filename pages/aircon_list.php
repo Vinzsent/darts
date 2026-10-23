@@ -4703,12 +4703,12 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                                         </select>
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="form-label">Brand</label>
-                                        <input type="text" name="brand" id="edit_brand" class="form-control" placeholder="e.g., Carrier, Daikin">
+                                        <label class="form-label">Brand <span class="text-danger">*</span></label>
+                                        <input type="text" name="brand" id="edit_brand" class="form-control" required placeholder="e.g., Carrier, Daikin">
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="form-label">Model</label>
-                                        <input type="text" name="model" id="edit_model" class="form-control" placeholder="e.g., 42QHC018">
+                                        <label class="form-label">Model <span class="text-danger">*</span></label>
+                                        <input type="text" name="model" id="edit_model" class="form-control" required placeholder="e.g., 42QHC018">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Type</label>
@@ -4868,15 +4868,11 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                 color: var(--accent-orange);
                 font-size: 1.3rem;
             }
-            /* Wider dialog for the enlarged modal (modal-xl caps at 1140px;
-               stretch a bit further on large screens). */
+            /* Comfortable dialog width: wide enough for the 4-column form,
+               but with clear margins on large screens. Bootstrap's own
+               margins keep it responsive on smaller viewports. */
             .aircon-edit-dialog {
-                max-width: 1240px;
-            }
-            @media (max-width: 1300px) {
-                .aircon-edit-dialog {
-                    max-width: 96vw;
-                }
+                max-width: 1000px;
             }
             .aircon-edit-subtitle {
                 color: rgba(255, 255, 255, 0.75);

@@ -62,7 +62,10 @@ if ($aircon_id <= 0) {
 }
 
 if (empty($brand) || empty($model)) {
-    $_SESSION['error'] = 'Brand and Model are required fields.';
+    $missing = [];
+    if (empty($brand)) $missing[] = 'Brand';
+    if (empty($model)) $missing[] = 'Model';
+    $_SESSION['error'] = implode(' and ', $missing) . ' cannot be empty. Please fill in the highlighted field(s) in the Edit form and save again.';
     header('Location: ../pages/aircon_list.php');
     exit();
 }
