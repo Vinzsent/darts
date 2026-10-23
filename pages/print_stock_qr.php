@@ -54,13 +54,11 @@ if ($stmt = $conn->prepare($sql)) {
     $stmt->close();
 }
 
-// Pre-render each row's QR (stored BLOB first) as a data URI.
+// Pre-render each row's QR fresh from the current row data as a data URI,
+// so printed labels always carry the item's latest details.
 $cards = [];
 foreach ($rows as $row) {
-    $png = stock_qr_blob($conn, $type, (int)$row['inventory_id']);
-    if ($png === null || strlen($png) < 100) {
-        $png = stock_qr_png($conn, $type, (int)$row['inventory_id']);
-    }
+    $png = stock_qr_png($conn, $type, (int)$row['inventory_id']);
     $cards[] = [
         'id'       => (int)$row['inventory_id'],
         'name'     => (string)$row['item_name'],

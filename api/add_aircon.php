@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $brand = trim($_POST['brand'] ?? '');
     $model = trim($_POST['model'] ?? '');
     $type = trim($_POST['type'] ?? '');
-    $capacity = trim($_POST['capacity'] ?? '');
+    $horse_power = trim($_POST['horse_power'] ?? '');
     $serial_number = trim($_POST['serial_number'] ?? '');
     $location = trim($_POST['location'] ?? '');
     $status = trim($_POST['status'] ?? 'Working');
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         brand, 
         model, 
         type, 
-        capacity, 
+        horse_power,
         serial_number, 
         location, 
         status, 
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $brand,
         $model,
         $type,
-        $capacity,
+        $horse_power,
         $serial_number,
         $location,
         $status,

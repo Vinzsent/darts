@@ -5,9 +5,12 @@
  * Usage: view_stock_qr.php?type=property|supply&id=<inventory_id>[&regen=1]
  *   - type=property -> row in property_inventory
  *   - type=supply   -> row in inventory
- *   - Reads the stored qr_code BLOB first; when missing (or &regen=1) the
- *     PNG is generated on the fly from the row data and persisted for next
- *     time, mirroring view_item_qr.php / view_po_qr.php.
+ *   - The QR is ALWAYS generated fresh from the live row (item, qty, status,
+ *     location, ...) so a scan decodes the item's current details — never a
+ *     stale snapshot. (&regen=1 is accepted for compatibility but is now
+ *     redundant: every request regenerates.)
+ *   - The qr_code column keeps its short code (e.g. PROP-01698 / INV-01302)
+ *     as a legacy scan identifier only.
  */
 session_start();
 include '../includes/db.php';
@@ -24,18 +27,15 @@ if (stock_qr_table($type) === null || $id <= 0) {
     exit();
 }
 
-// Try the stored BLOB first (unless a regen was requested).
-$png = null;
-if (!$regen) {
-    $png = stock_qr_blob($conn, $type, $id);
-}
-
-// Fall back to generating on the fly (and persist it for next time).
-if ($png === null) {
-    $png = stock_qr_png($conn, $type, $id);
-    if ($png !== null) {
-        stock_qr_persist($conn, $type, $id, $png);
-    }
+// Always generate from the live row so the QR payload (item, qty, status,
+// location, ...) reflects the current details at scan time. The stored
+// qr_code keeps its short code (e.g. PROP-01698 / INV-01302) as a legacy
+// scan identifier only.
+$png = stock_qr_png($conn, $type, $id);
+if ($png !== null) {
+    // Ensures the row carries its short code for legacy/manual scans
+    // (no-op when qr_code already holds a value).
+    stock_qr_persist($conn, $type, $id, $png);
 }
 
 if ($png === null) {

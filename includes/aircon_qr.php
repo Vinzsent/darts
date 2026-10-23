@@ -10,7 +10,7 @@ function aircon_qr_png(int $aircon_id): ?string
     global $conn;
 
     $stmt = $conn->prepare(
-        "SELECT aircon_id, item_number, brand, model, type, capacity, serial_number,
+        "SELECT aircon_id, item_number, brand, model, type, horse_power, serial_number,
                 location, area, status, campus, lifespan, qr_code
          FROM aircons WHERE aircon_id = ? LIMIT 1"
     );

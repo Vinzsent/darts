@@ -183,7 +183,7 @@ if ($report_type === 'aircon') {
         <thead>
             <tr>
                 <th>Campus</th><th>Brand</th><th>Model</th><th>Type</th>
-                <th>Capacity</th><th>Serial No.</th><th>Location</th><th>Status</th>
+                <th>Horse Power</th><th>Serial No.</th><th>Location</th><th>Status</th>
                 <th>Purchase Date</th><th>Last Service</th><th>Warranty Expiry</th><th>Purchase Price</th>
             </tr>
         </thead>
@@ -195,7 +195,7 @@ if ($report_type === 'aircon') {
                 <td><?= htmlspecialchars($row['brand'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['model'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['type'] ?? '—') ?></td>
-                <td><?= htmlspecialchars($row['capacity'] ?? '—') ?></td>
+                <td><?= htmlspecialchars($row['horse_power'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['serial_number'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['location'] ?? '—') ?></td>
                 <td><?= htmlspecialchars($row['status']) ?></td>

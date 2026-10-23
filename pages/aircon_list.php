@@ -1253,7 +1253,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-brand="<?= htmlspecialchars($aircon['brand'] ?? '', ENT_QUOTES) ?>"
                                                             data-model="<?= htmlspecialchars($aircon['model'] ?? '', ENT_QUOTES) ?>"
                                                             data-type="<?= htmlspecialchars($aircon['type'] ?? '', ENT_QUOTES) ?>"
-                                                            data-capacity="<?= htmlspecialchars($aircon['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                            data-horse-power="<?= htmlspecialchars($aircon['horse_power'] ?? '', ENT_QUOTES) ?>"
                                                             data-serial-number="<?= htmlspecialchars($aircon['serial_number'] ?? '', ENT_QUOTES) ?>"
                                                             data-location="<?= htmlspecialchars($aircon['location'] ?? '', ENT_QUOTES) ?>"
                                                             data-status="<?= htmlspecialchars($aircon['status'] ?? '', ENT_QUOTES) ?>"
@@ -1356,7 +1356,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-brand="<?= htmlspecialchars($aircon['brand'] ?? '', ENT_QUOTES) ?>"
                                                             data-model="<?= htmlspecialchars($aircon['model'] ?? '', ENT_QUOTES) ?>"
                                                             data-type="<?= htmlspecialchars($aircon['type'] ?? '', ENT_QUOTES) ?>"
-                                                            data-capacity="<?= htmlspecialchars($aircon['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                            data-horse-power="<?= htmlspecialchars($aircon['horse_power'] ?? '', ENT_QUOTES) ?>"
                                                             data-serial-number="<?= htmlspecialchars($aircon['serial_number'] ?? '', ENT_QUOTES) ?>"
                                                             data-location="<?= htmlspecialchars($aircon['location'] ?? '', ENT_QUOTES) ?>"
                                                             data-status="<?= htmlspecialchars($aircon['status'] ?? '', ENT_QUOTES) ?>"
@@ -1451,7 +1451,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-brand="<?= htmlspecialchars($aircon['brand'] ?? '', ENT_QUOTES) ?>"
                                                             data-model="<?= htmlspecialchars($aircon['model'] ?? '', ENT_QUOTES) ?>"
                                                             data-type="<?= htmlspecialchars($aircon['type'] ?? '', ENT_QUOTES) ?>"
-                                                            data-capacity="<?= htmlspecialchars($aircon['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                            data-horse-power="<?= htmlspecialchars($aircon['horse_power'] ?? '', ENT_QUOTES) ?>"
                                                             data-serial-number="<?= htmlspecialchars($aircon['serial_number'] ?? '', ENT_QUOTES) ?>"
                                                             data-location="<?= htmlspecialchars($aircon['location'] ?? '', ENT_QUOTES) ?>"
                                                             data-status="<?= htmlspecialchars($aircon['status'] ?? '', ENT_QUOTES) ?>"
@@ -1546,7 +1546,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                             data-brand="<?= htmlspecialchars($aircon['brand'] ?? '', ENT_QUOTES) ?>"
                                                             data-model="<?= htmlspecialchars($aircon['model'] ?? '', ENT_QUOTES) ?>"
                                                             data-type="<?= htmlspecialchars($aircon['type'] ?? '', ENT_QUOTES) ?>"
-                                                            data-capacity="<?= htmlspecialchars($aircon['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                            data-horse-power="<?= htmlspecialchars($aircon['horse_power'] ?? '', ENT_QUOTES) ?>"
                                                             data-serial-number="<?= htmlspecialchars($aircon['serial_number'] ?? '', ENT_QUOTES) ?>"
                                                             data-location="<?= htmlspecialchars($aircon['location'] ?? '', ENT_QUOTES) ?>"
                                                             data-status="<?= htmlspecialchars($aircon['status'] ?? '', ENT_QUOTES) ?>"
@@ -1839,11 +1839,10 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <th>Brand</th>
                                 <th>Model</th>
                                 <th>Type</th>
+                                <th>Horse Power</th>
                                 <th>Serial No.</th>
                                 <th>Location</th>
                                 <th>Status</th>
-                                <th>Purchase Date</th>
-                                <th>Warranty Expiry</th>
                                 <th>Maintenance Schedule</th>
                                 <th>Installation Date/ Release Date</th>
                                 <th>Notes</th>
@@ -1864,6 +1863,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         <td data-label="Brand"><?= htmlspecialchars($row['brand'] ?? 'N/A') ?></td>
                                         <td data-label="Model"><?= htmlspecialchars($row['model'] ?? 'N/A') ?></td>
                                         <td data-label="Type"><?= htmlspecialchars($row['type'] ?? 'N/A') ?></td>
+                                        <td data-label="Horse Power"><?= htmlspecialchars($row['horse_power'] ?? 'N/A') ?></td>
                                         <td data-label="Serial No."><?= htmlspecialchars($row['serial_number'] ?? 'N/A') ?></td>
                                         <td data-label="Location"><?= htmlspecialchars($row['location'] ?? 'N/A') ?></td>
                                         <td data-label="Status">
@@ -1877,8 +1877,6 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                 <?= htmlspecialchars($row['status'] ?? 'N/A') ?>
                                             </span>
                                         </td>
-                                        <td data-label="Purchase Date"><?= !empty($row['purchase_date']) ? date('M d, Y', strtotime($row['purchase_date'])) : 'N/A' ?></td>
-                                        <td data-label="Warranty Expiry"><?= !empty($row['warranty_expiry']) ? date('M d, Y', strtotime($row['warranty_expiry'])) : 'N/A' ?></td>
                                         <td data-label="Maintenance Schedule">
                                             <button class="btn btn-sm btn-outline-info view-maintenance-btn"
                                                 data-aircon-id="<?= (int)$row['aircon_id'] ?>"
@@ -1915,7 +1913,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     data-brand="<?= htmlspecialchars($row['brand'] ?? '', ENT_QUOTES) ?>"
                                                     data-model="<?= htmlspecialchars($row['model'] ?? '', ENT_QUOTES) ?>"
                                                     data-type="<?= htmlspecialchars($row['type'] ?? '', ENT_QUOTES) ?>"
-                                                    data-capacity="<?= htmlspecialchars($row['capacity'] ?? '', ENT_QUOTES) ?>"
+                                                    data-horse-power="<?= htmlspecialchars($row['horse_power'] ?? '', ENT_QUOTES) ?>"
                                                     data-serial-number="<?= htmlspecialchars($row['serial_number'] ?? '', ENT_QUOTES) ?>"
                                                     data-location="<?= htmlspecialchars($row['location'] ?? '', ENT_QUOTES) ?>"
                                                     data-status="<?= htmlspecialchars($row['status'] ?? '', ENT_QUOTES) ?>"
@@ -1946,7 +1944,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                                     <?= htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
-                                                    <?= htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
+                                                    <?= htmlspecialchars(json_encode($row['horse_power'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
                                                     <?= htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') ?>,
@@ -1978,7 +1976,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <?php endwhile; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="15" class="text-center py-4">
+                                    <td colspan="13" class="text-center py-4">
                                         <i class="fas fa-snowflake fa-3x text-muted mb-3"></i>
                                         <p class="text-muted">No aircon units found</p>
                                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
@@ -2149,8 +2147,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             </select>
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label">Capacity (BTU/hr)</label>
-                                            <input type="text" name="capacity" class="form-control" placeholder="e.g., 18,000">
+                                            <label class="form-label">Horse Power</label>
+                                            <input type="text" name="horse_power" class="form-control" placeholder="e.g., 1.5 HP">
                                         </div>
                                         <div class="col-md-3">
                                             <label class="form-label">Serial Number</label>
@@ -2456,7 +2454,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                     <div class="aircon-view-keyfact"><label>Serial No.</label><b id="view_serial_number">-</b></div>
                                     <div class="aircon-view-keyfact"><label>Location</label><b id="view_location">-</b></div>
                                     <div class="aircon-view-keyfact"><label>Area</label><b id="view_area">-</b></div>
-                                    <div class="aircon-view-keyfact"><label>Capacity (BTU/hr)</label><b id="view_capacity">-</b></div>
+                                    <div class="aircon-view-keyfact"><label>Horse Power</label><b id="view_horse_power">-</b></div>
                                 </div>
                             </div>
 
@@ -3034,7 +3032,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         const brand = button.data('brand') || '';
                         const model = button.data('model') || '';
                         const type = button.data('type') || '';
-                        const capacity = button.data('capacity') || '';
+                        const horsePower = button.data('horse-power') || '';
                         const serialNumber = button.data('serial-number') || '';
                         const location = button.data('location') || '';
                         const area = button.data('area') || '';
@@ -3059,7 +3057,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
 
                         // Call the viewAirconDetails function
                         viewAirconDetails(
-                            airconId, itemNumber, brand, model, type, capacity, serialNumber,
+                            airconId, itemNumber, brand, model, type, horsePower, serialNumber,
                             location, area, status, purchaseDate, warrantyExpiry, lastServiceDate,
                             maintenanceSchedule, supplierInfo, installationDate, energyEfficiency,
                             powerConsumption, notes, purchasePrice, depreciatedValue, lifespan, receiver,
@@ -4042,7 +4040,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 });
 
                 // Function to view aircon details
-                function viewAirconDetails(airconId, itemNumber, brand, model, type, capacity, serialNumber, location, area, status,
+                function viewAirconDetails(airconId, itemNumber, brand, model, type, horse_power, serialNumber, location, area, status,
                     purchaseDate, warrantyExpiry, lastServiceDate, maintenanceSchedule, supplierInfo, installationDate,
                     energyEfficiency, powerConsumption, notes, purchasePrice, depreciatedValue, lifespan, receiver, createdBy, dateCreated, picture) {
 
@@ -4052,7 +4050,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                     document.getElementById('view_brand').textContent = brand || 'N/A';
                     document.getElementById('view_model').textContent = model || 'N/A';
                     document.getElementById('view_type').textContent = type || 'N/A';
-                    document.getElementById('view_capacity').textContent = capacity || 'N/A';
+                    document.getElementById('view_horse_power').textContent = horse_power || 'N/A';
                     document.getElementById('view_serial_number').textContent = serialNumber || 'N/A';
                     document.getElementById('view_location').textContent = location || 'N/A';
                     document.getElementById('view_area').textContent = area || 'N/A';
@@ -4432,11 +4430,10 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
             echo '<th>Brand</th>';
             echo '<th>Model</th>';
             echo '<th>Type</th>';
+            echo '<th>Horse Power</th>';
             echo '<th>Serial No.</th>';
             echo '<th>Location</th>';
             echo '<th>Status</th>';
-            echo '<th>Purchase Date</th>';
-            echo '<th>Warranty Expiry</th>';
             echo '<th>Maintenance Schedule</th>';
             echo '<th>Installation Date/ Release Date</th>';
             echo '<th>Notes</th>';
@@ -4461,11 +4458,10 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                     echo '<td data-label="Brand">' . htmlspecialchars($row['brand'] ?? 'N/A') . '</td>';
                     echo '<td data-label="Model">' . htmlspecialchars($row['model'] ?? 'N/A') . '</td>';
                     echo '<td data-label="Type">' . htmlspecialchars($row['type'] ?? 'N/A') . '</td>';
+                    echo '<td data-label="Horse Power">' . htmlspecialchars($row['horse_power'] ?? 'N/A') . '</td>';
                     echo '<td data-label="Serial No.">' . htmlspecialchars($row['serial_number'] ?? 'N/A') . '</td>';
                     echo '<td data-label="Location">' . htmlspecialchars($row['location'] ?? 'N/A') . '</td>';
                     echo '<td data-label="Status"><span class="badge bg-' . $status_class . '">' . htmlspecialchars($row['status'] ?? 'N/A') . '</span></td>';
-                    echo '<td data-label="Purchase Date">' . (!empty($row['purchase_date']) ? date('M d, Y', strtotime($row['purchase_date'])) : 'N/A') . '</td>';
-                    echo '<td data-label="Warranty Expiry">' . (!empty($row['warranty_expiry']) ? date('M d, Y', strtotime($row['warranty_expiry'])) : 'N/A') . '</td>';
 
                     echo '<td data-label="Maintenance Schedule">
                             <button class="btn btn-sm btn-outline-primary view-maintenance-btn" 
@@ -4492,7 +4488,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                             . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                            . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['horse_power'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -4521,7 +4517,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                             . htmlspecialchars(json_encode($row['brand'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['model'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['type'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
-                            . htmlspecialchars(json_encode($row['capacity'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
+                            . htmlspecialchars(json_encode($row['horse_power'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['serial_number'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['location'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
                             . htmlspecialchars(json_encode($row['area'] ?? ''), ENT_QUOTES, 'UTF-8') . ', '
@@ -4547,7 +4543,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                     echo '</tr>';
                 }
             } else {
-                echo '<tr><td colspan="15" class="text-center py-4"><i class="fas fa-snowflake fa-3x text-muted mb-3"></i><p class="text-muted">No aircon units found</p></td></tr>';
+                echo '<tr><td colspan="13" class="text-center py-4"><i class="fas fa-snowflake fa-3x text-muted mb-3"></i><p class="text-muted">No aircon units found</p></td></tr>';
             }
 
             echo '</tbody></table></div>';
@@ -4602,7 +4598,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
         <script>
             // Add this to your aircon_list.php, preferably in the head section or before the closing body tag
             function openEditAirconModal(
-                aircon_id, item_name, category, brand, model, type, capacity, serial_number, location, area, status, campus,
+                aircon_id, item_name, category, brand, model, type, horse_power, serial_number, location, area, status, campus,
                 purchase_date, warranty_expiry, last_service_date, maintenance_schedule, supplier_id,
                 installation_date, energy_efficient, power_consumption, notes, purchase_price, depreciated_value, lifespan, picture
             ) {
@@ -4622,7 +4618,7 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                 document.getElementById('edit_brand').value = brand || '';
                 document.getElementById('edit_model').value = model || '';
                 document.getElementById('edit_type').value = type || '';
-                document.getElementById('edit_capacity').value = capacity || '';
+                document.getElementById('edit_horse_power').value = horse_power || '';
                 document.getElementById('edit_serial_number').value = serial_number || '';
                 document.getElementById('edit_location').value = location || '';
                 document.getElementById('edit_area').value = area || '';
@@ -4854,8 +4850,8 @@ $status_raw_ajax = trim($_GET['status'] ?? '');
                                         </select>
                                     </div>
                                     <div class="col-md-3">
-                                        <label class="form-label">Capacity (BTU/hr)</label>
-                                        <input type="text" name="capacity" id="edit_capacity" class="form-control" placeholder="e.g., 18,000">
+                                        <label class="form-label">Horse Power</label>
+                                        <input type="text" name="horse_power" id="edit_horse_power" class="form-control" placeholder="e.g., 1.5 HP">
                                     </div>
                                     <div class="col-md-3">
                                         <label class="form-label">Serial Number</label>

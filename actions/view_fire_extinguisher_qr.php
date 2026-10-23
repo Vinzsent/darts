@@ -3,6 +3,12 @@
  * Stream one FIRE EXTINGUISHER's QR code as a PNG image.
  *
  * Usage: view_fire_extinguisher_qr.php?id=<fire_extinguisher_id>[&regen=1]
+ *   - The QR is ALWAYS generated fresh from the live `fire_extinguishers`
+ *     row (agent, pressure, condition, location, expiry, ...) so a scan
+ *     decodes the unit's current details — never a stale snapshot.
+ *     (&regen=1 is accepted for compatibility but is now redundant.)
+ *   - The qr_code column keeps its short code (e.g. FE-276) as a legacy
+ *     scan identifier only.
  */
 session_start();
 require_once __DIR__ . '/../includes/db.php';
@@ -55,36 +61,15 @@ function buildFeQrPng($conn, $id)
     return $qr->toPng(6, 4);
 }
 
-// Try stored value first
+// Always generate from the live row so the QR payload reflects the
+// current details (agent, pressure, condition, location, ...) at scan
+// time. The stored qr_code text (e.g. FE-276) stays as a legacy scan
+// identifier only.
 $png = null;
-if (!$regen) {
-    $stmt = $conn->prepare("SELECT qr_code FROM fire_extinguishers WHERE fire_extinguisher_id = ? LIMIT 1");
-    if ($stmt) {
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        $stmt->bind_result($val);
-        if ($stmt->fetch() && $val !== null && $val !== '') {
-            if (strpos($val, "\x89PNG") === 0) {
-                $png = $val;
-            } else {
-                try {
-                    $qr  = new QrCode($val, QrCode::ECC_MEDIUM);
-                    $png = $qr->toPng(6, 4);
-                } catch (Throwable $e) {
-                    $png = null;
-                }
-            }
-        }
-        $stmt->close();
-    }
-}
-
-if ($png === null) {
-    try {
-        $png = buildFeQrPng($conn, $id);
-    } catch (Throwable $e) {
-        $png = null;
-    }
+try {
+    $png = buildFeQrPng($conn, $id);
+} catch (Throwable $e) {
+    $png = null;
 }
 
 if ($png === null) {
