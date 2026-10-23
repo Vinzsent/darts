@@ -804,8 +804,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <a href="../actions/export_inventory.php" class="btn btn-sm btn-success ms-1" title="Export to Excel">
                                     <i class="fas fa-file-excel"></i>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all supplies"
-                                        onclick="printStockQr('supply')">
+                                <button type="button" class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all supplies (with live progress)"
+                                        onclick="printAllStockQr('supply')">
                                     <i class="fas fa-print"></i> Print QR
                                 </button>
                             <?php endif; ?>
@@ -2887,6 +2887,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 });
             </script>
         <?php endif; ?>
+
+        <script src="../assets/js/print_all_stock_qr.js"></script>
 
         <?php
         if (!$isAjax) {

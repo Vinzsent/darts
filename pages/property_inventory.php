@@ -1373,8 +1373,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                         <i class="fas fa-file-excel"></i>
                     </a>
                     <?php if (strtolower($user_type) != 'purchasing officer' && strtolower($user_type) != 'purchasing staff' && strtolower($user_type) != 'purchasingstaff'): ?>
-                        <button class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all property items"
-                                onclick="printStockQr('property')">
+                        <button class="btn btn-sm btn-outline-light ms-1" title="Print QR labels for all property items (with live progress)"
+                                onclick="printAllStockQr('property')">
                             <i class="fas fa-print"></i> Print QR
                         </button>
                         <button class="btn btn-sm btn-add text-dark" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
@@ -2719,11 +2719,17 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 <div class="fe-table-wrap">
                     <div class="fe-table-head">
                         <h3>Fire Extinguisher Records</h3>
-                        <?php if (!$is_purchasing): ?>
-                            <button class="fe-add-btn" type="button" data-bs-toggle="modal" data-bs-target="#addFireExtinguisherModal">
-                                <i class="fas fa-plus me-1"></i>Add Extinguisher
-                            </button>
-                        <?php endif; ?>
+                        <div class="d-flex gap-2">
+                            <?php if (!$is_purchasing): ?>
+                                <button class="fe-add-btn" type="button" title="Print QR labels for all fire extinguishers (with live progress)"
+                                        onclick="printAllStockQr('fire')">
+                                    <i class="fas fa-print me-1"></i>Print QR
+                                </button>
+                                <button class="fe-add-btn" type="button" data-bs-toggle="modal" data-bs-target="#addFireExtinguisherModal">
+                                    <i class="fas fa-plus me-1"></i>Add Extinguisher
+                                </button>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover mb-0 align-middle">
@@ -4015,6 +4021,8 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 });
             </script>
         <?php endif; ?>
+
+        <script src="../assets/js/print_all_stock_qr.js"></script>
 
         <?php
         if (!$isAjax) {
