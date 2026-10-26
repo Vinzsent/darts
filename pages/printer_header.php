@@ -27,9 +27,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Security validation failed (Invalid CSRF token).");
         }
 
-        // Fetch current settings to get existing logo path
-        $query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 1");
-        $current = $query->fetch_assoc();
+        // Which header tab was submitted? Row 1 = General, Row 2 = Property Custodian
+        $header_role = ($_POST['header_role'] ?? '') === 'property_custodian' ? 'property_custodian' : 'general';
+        $target_id   = ($header_role === 'property_custodian') ? 2 : 1;
+        $logo_prefix = ($header_role === 'property_custodian') ? 'pc_logo_' : 'logo_';
+        $role_label  = ($header_role === 'property_custodian') ? 'Property Custodian' : 'General';
+
+        // Fetch the target row (may not exist yet for the Property Custodian header)
+        $stmt0 = $conn->prepare("SELECT * FROM printer_header_settings WHERE id = ?");
+        $stmt0->bind_param('i', $target_id);
+        $stmt0->execute();
+        $current = $stmt0->get_result()->fetch_assoc();
+        $stmt0->close();
+
         $logo_path = $current['logo_path'] ?? 'assets/images/logo.png';
 
         // Sanitize text inputs
@@ -43,10 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Enforce required fields
         if (empty($school_name)) {
-            throw new Exception("School Name is required.");
+            throw new Exception("School Name is required for the {$role_label} header.");
         }
         if (empty($address)) {
-            throw new Exception("Address is required.");
+            throw new Exception("Address is required for the {$role_label} header.");
         }
 
         // Validate Email format if set
@@ -54,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Invalid Email Address format.");
         }
 
-        // Handle File Upload for School Logo
+        // Handle File Upload for the header Logo
         if (isset($_FILES['logo']) && $_FILES['logo']['error'] !== UPLOAD_ERR_NO_FILE) {
             if ($_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
                 throw new Exception("Error uploading file. Code: " . $_FILES['logo']['error']);
@@ -93,12 +103,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mkdir($upload_dir, 0777, true);
             }
 
-            // Clean filename and generate a unique name
-            $clean_filename = 'logo_' . time() . '_' . uniqid() . '.' . $file_ext;
+            // Clean filename and generate a unique name (per header, so the
+            // General and Property Custodian logos never overwrite each other)
+            $clean_filename = $logo_prefix . time() . '_' . uniqid() . '.' . $file_ext;
             $destination = $upload_dir . $clean_filename;
 
             if (move_uploaded_file($file_tmp, $destination)) {
-                // Delete previous logo file if it's a custom uploaded one (but keep default assets logo)
+                // Delete this header's previous uploaded logo (keep default assets logo)
                 if (!empty($logo_path) && strpos($logo_path, 'uploads/') === 0 && file_exists('../' . $logo_path)) {
                     @unlink('../' . $logo_path);
                 }
@@ -108,35 +119,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Update database (settings row is locked to ID 1)
-        $stmt = $conn->prepare("UPDATE printer_header_settings SET 
-            school_name = ?, 
-            address = ?, 
-            telephone_number = ?, 
-            fax_number = ?, 
-            mobile_number = ?, 
-            email_address = ?, 
-            website = ?, 
-            logo_path = ? 
-            WHERE id = 1");
+        // Upsert the settings row (General = ID 1, Property Custodian = ID 2)
+        if ($current !== null) {
+            $stmt = $conn->prepare("UPDATE printer_header_settings SET 
+                school_name = ?, 
+                address = ?, 
+                telephone_number = ?, 
+                fax_number = ?, 
+                mobile_number = ?, 
+                email_address = ?, 
+                website = ?, 
+                logo_path = ? 
+                WHERE id = ?");
 
-        $stmt->bind_param(
-            "ssssssss",
-            $school_name,
-            $address,
-            $telephone_number,
-            $fax_number,
-            $mobile_number,
-            $email_address,
-            $website,
-            $logo_path
-        );
+            $stmt->bind_param(
+                "ssssssssi",
+                $school_name,
+                $address,
+                $telephone_number,
+                $fax_number,
+                $mobile_number,
+                $email_address,
+                $website,
+                $logo_path,
+                $target_id
+            );
+        } else {
+            $stmt = $conn->prepare("INSERT INTO printer_header_settings 
+                (id, school_name, address, telephone_number, fax_number, mobile_number, email_address, website, logo_path) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $stmt->bind_param(
+                "issssssss",
+                $target_id,
+                $school_name,
+                $address,
+                $telephone_number,
+                $fax_number,
+                $mobile_number,
+                $email_address,
+                $website,
+                $logo_path
+            );
+        }
 
         if (!$stmt->execute()) {
             throw new Exception("Database update failed: " . $stmt->error);
         }
 
-        $_SESSION['message'] = "Printer header settings updated successfully.";
+        $_SESSION['message'] = $role_label . " printer header settings updated successfully.";
         header("Location: printer_header.php");
         exit;
     } catch (Exception $e) {
@@ -151,7 +182,7 @@ $query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 1");
 $settings = $query->fetch_assoc();
 
 if (!$settings) {
-    // Fallback default structure
+    // Fallback default structure (General header)
     $settings = [
         'school_name' => 'DAVAO CENTRAL COLLEGE',
         'address' => 'Juan dela Cruz St., Toril, Davao City, Philippines',
@@ -163,6 +194,16 @@ if (!$settings) {
         'logo_path' => 'assets/images/logo.png'
     ];
 }
+
+// Property Custodian header (row 2). When it has not been configured yet,
+// seed the form/preview from the General header values as a starting point.
+$pc_row = null;
+$pc_query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 2");
+if ($pc_query) {
+    $pc_row = $pc_query->fetch_assoc();
+}
+$pc_configured = $pc_row && trim((string)($pc_row['school_name'] ?? '')) !== '';
+$pc_settings = $pc_row ?: $settings;
 ?>
 
 <style>
@@ -205,6 +246,67 @@ if (!$settings) {
         font-size: 0.9rem;
         opacity: 0.85;
         margin-top: 4px;
+    }
+
+    /* ─── Header Tabs ─── */
+    .header-tabs {
+        display: flex;
+        gap: 10px;
+        background: white;
+        border-radius: 14px;
+        box-shadow: var(--card-shadow);
+        padding: 8px;
+        margin-bottom: 2rem;
+        list-style: none;
+        flex-wrap: wrap;
+    }
+
+    .header-tab {
+        flex: 1 1 260px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        border: none;
+        background: transparent;
+        padding: 0.85rem 1.25rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #4a5568;
+        transition: var(--transition);
+        text-align: left;
+    }
+
+    .header-tab i {
+        font-size: 1.15rem;
+    }
+
+    .header-tab:hover {
+        background: #f0f7f4;
+        color: var(--dcc-green);
+    }
+
+    .header-tab.active {
+        background: linear-gradient(135deg, var(--dcc-green) 0%, var(--dcc-green-light) 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(7, 59, 29, 0.25);
+    }
+
+    .tab-label {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.25;
+    }
+
+    .tab-sub {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: #718096;
+    }
+
+    .header-tab.active .tab-sub {
+        color: rgba(255, 255, 255, 0.75);
     }
 
     .content-grid {
@@ -402,6 +504,18 @@ if (!$settings) {
         color: white;
     }
 
+    /* Info note on the Property Custodian tab */
+    .pc-info-note {
+        background: #fffbeb;
+        border-left: 4px solid var(--dcc-gold);
+        color: #92400e;
+        border-radius: 10px;
+        padding: 0.9rem 1.25rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+
     /* Alerts styling */
     .alert-modern {
         border-radius: 12px;
@@ -457,6 +571,10 @@ if (!$settings) {
         .settings-card {
             padding: 1.25rem;
         }
+
+        .header-tab {
+            flex: 1 1 100%;
+        }
     }
 </style>
 
@@ -485,118 +603,273 @@ if (!$settings) {
 
     <div class="page-header">
         <h1 class="page-title"><i class="fas fa-print me-2"></i>Printer Paper Header Settings</h1>
-        <p class="page-subtitle">Customize and preview the letterhead design printed globally on all system sheets</p>
+        <p class="page-subtitle">Customize and preview the letterhead designs printed on system sheets — one general header and a dedicated Property Custodian header</p>
     </div>
 
-    <div class="content-grid">
+    <!-- Header Tabs -->
+    <ul class="nav header-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="header-tab active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button" role="tab" aria-selected="true">
+                <i class="fas fa-building"></i>
+                <span class="tab-label">General Header
+                    <small class="tab-sub">Default letterhead for all system sheets</small>
+                </span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="header-tab" data-bs-toggle="tab" data-bs-target="#tab-property-custodian" type="button" role="tab" aria-selected="false">
+                <i class="fas fa-warehouse"></i>
+                <span class="tab-label">Property Custodian Header
+                    <small class="tab-sub">Used on property reports printed by the custodian</small>
+                </span>
+            </button>
+        </li>
+    </ul>
 
-        <!-- Interactive Letterhead Live Preview -->
-        <div class="preview-card">
-            <div class="preview-header">
-                <span class="text-sm font-semibold text-gray-500 uppercase"><i class="fas fa-eye me-1"></i> Live Interactive Preview</span>
-                <span class="badge bg-success-subtle text-success border border-success-subtle font-medium text-xs">Dynamic Printout Format</span>
-            </div>
+    <div class="tab-content">
 
-            <div class="preview-paper">
-                <div class="letterhead-container">
-                    <img id="preview-logo" class="letterhead-logo" src="../<?= htmlspecialchars($settings['logo_path']) ?>" alt="School Logo" onerror="this.src='../assets/images/logo.png'">
-                    <div class="letterhead-details">
-                        <h2 style="font-family: arial;" id="preview-school-name" class="letterhead-title"><?= htmlspecialchars(strtoupper($settings['school_name'])) ?></h2>
-                        <p id="preview-address" class="letterhead-text"><?= htmlspecialchars($settings['address']) ?></p>
-                        <p id="preview-telefax" class="letterhead-subtext">
-                            <?php
-                            $tel_fax = [];
-                            if (!empty($settings['telephone_number'])) $tel_fax[] = 'Tel. No. ' . $settings['telephone_number'];
-                            if (!empty($settings['fax_number'])) $tel_fax[] = 'Fax No. ' . $settings['fax_number'];
-                            if (!empty($settings['mobile_number'])) $tel_fax[] = 'Mobile: ' . $settings['mobile_number'];
-                            echo htmlspecialchars(implode(' / ', $tel_fax));
-                            ?>
-                        </p>
+        <!-- ═══════════════ TAB 1: GENERAL HEADER ═══════════════ -->
+        <div class="tab-pane fade show active" id="tab-general" role="tabpanel">
+            <div class="content-grid">
+
+                <!-- Interactive Letterhead Live Preview -->
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <span class="text-sm font-semibold text-gray-500 uppercase"><i class="fas fa-eye me-1"></i> Live Interactive Preview</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle font-medium text-xs">Dynamic Printout Format</span>
+                    </div>
+
+                    <div class="preview-paper">
+                        <div class="letterhead-container">
+                            <img id="preview-logo" class="letterhead-logo" src="../<?= htmlspecialchars($settings['logo_path']) ?>" alt="School Logo" onerror="this.src='../assets/images/logo.png'">
+                            <div class="letterhead-details">
+                                <h2 style="font-family: arial;" id="preview-school-name" class="letterhead-title"><?= htmlspecialchars(strtoupper($settings['school_name'])) ?></h2>
+                                <p id="preview-address" class="letterhead-text"><?= htmlspecialchars($settings['address']) ?></p>
+                                <p id="preview-telefax" class="letterhead-subtext">
+                                    <?php
+                                    $tel_fax = [];
+                                    if (!empty($settings['telephone_number'])) $tel_fax[] = 'Tel. No. ' . $settings['telephone_number'];
+                                    if (!empty($settings['fax_number'])) $tel_fax[] = 'Fax No. ' . $settings['fax_number'];
+                                    if (!empty($settings['mobile_number'])) $tel_fax[] = 'Mobile: ' . $settings['mobile_number'];
+                                    echo htmlspecialchars(implode(' / ', $tel_fax));
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="letterhead-banner">
+                            <span id="preview-email"><i class="fas fa-envelope"></i> Email Address: <?= htmlspecialchars($settings['email_address']) ?></span>
+                            <span id="preview-website"><i class="fas fa-globe"></i> Website: <?= htmlspecialchars($settings['website']) ?></span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="letterhead-banner">
-                    <span id="preview-email"><i class="fas fa-envelope"></i> Email Address: <?= htmlspecialchars($settings['email_address']) ?></span>
-                    <span id="preview-website"><i class="fas fa-globe"></i> Website: <?= htmlspecialchars($settings['website']) ?></span>
+                <!-- Configuration Settings Form -->
+                <div class="settings-card">
+                    <form action="printer_header.php" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="header_role" value="general">
+
+                        <!-- School Profile Details -->
+                        <div class="form-section-title">
+                            <i class="fas fa-school me-2"></i> School Information
+                        </div>
+
+                        <div class="form-group-grid">
+                            <div>
+                                <label class="form-label" for="school_name">Name of School *</label>
+                                <input type="text" id="school_name" name="school_name" class="form-control w-full" value="<?= htmlspecialchars($settings['school_name']) ?>" required>
+                            </div>
+                            <div>
+                                <label class="form-label" for="address">Address *</label>
+                                <input type="text" id="address" name="address" class="form-control w-full" value="<?= htmlspecialchars($settings['address']) ?>" required>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="form-section-title">
+                            <i class="fas fa-phone-alt me-2"></i> Contact Details
+                        </div>
+
+                        <div class="form-group-grid col-3">
+                            <div>
+                                <label class="form-label" for="telephone_number">Telephone Number</label>
+                                <input type="text" id="telephone_number" name="telephone_number" class="form-control w-full" value="<?= htmlspecialchars($settings['telephone_number']) ?>" placeholder="e.g. (082) 291-1882">
+                            </div>
+                            <div>
+                                <label class="form-label" for="fax_number">Fax Number</label>
+                                <input type="text" id="fax_number" name="fax_number" class="form-control w-full" value="<?= htmlspecialchars($settings['fax_number']) ?>" placeholder="e.g. (082) 291-2053">
+                            </div>
+                            <div>
+                                <label class="form-label" for="mobile_number">Mobile Number</label>
+                                <input type="text" id="mobile_number" name="mobile_number" class="form-control w-full" value="<?= htmlspecialchars($settings['mobile_number']) ?>" placeholder="e.g. +639123456789">
+                            </div>
+                        </div>
+
+                        <div class="form-group-grid">
+                            <div>
+                                <label class="form-label" for="email_address">Email Address</label>
+                                <input type="email" id="email_address" name="email_address" class="form-control w-full" value="<?= htmlspecialchars($settings['email_address']) ?>" placeholder="e.g. info@school.edu.ph">
+                            </div>
+                            <div>
+                                <label class="form-label" for="website">Website URL</label>
+                                <input type="text" id="website" name="website" class="form-control w-full" value="<?= htmlspecialchars($settings['website']) ?>" placeholder="e.g. www.school.edu.ph">
+                            </div>
+                        </div>
+
+                        <!-- Logo Uploader -->
+                        <div class="form-section-title">
+                            <i class="fas fa-image me-2"></i> School Logo
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">School Logo Image</label>
+                            <div class="file-upload-wrapper">
+                                <i class="fas fa-cloud-upload-alt file-upload-icon"></i>
+                                <div class="file-upload-text">Drag and drop your logo file here, or click to browse</div>
+                                <div class="file-upload-subtext">Supported formats: PNG, JPG, JPEG (Max 2MB)</div>
+                                <input type="file" id="logo" name="logo" class="file-upload-input" accept="image/png, image/jpeg, image/jpg">
+                            </div>
+                            <div id="file-selected-name" class="text-xs text-gray-500 mt-2 font-medium" style="display: none;"></div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn-submit">
+                                <i class="fas fa-save me-2"></i> Save General Header
+                            </button>
+                        </div>
+                    </form>
                 </div>
+
             </div>
         </div>
 
-        <!-- Configuration Settings Form -->
-        <div class="settings-card">
-            <form action="printer_header.php" method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+        <!-- ═══════════════ TAB 2: PROPERTY CUSTODIAN HEADER ═══════════════ -->
+        <div class="tab-pane fade" id="tab-property-custodian" role="tabpanel">
+            <div class="content-grid">
 
-                <!-- School Profile Details -->
-                <div class="form-section-title">
-                    <i class="fas fa-school me-2"></i> School Information
+                <!-- Info note -->
+                <div class="pc-info-note">
+                    <i class="fas fa-info-circle me-2"></i>
+                    This letterhead is applied to <strong>Property Reports & printed property sheets</strong> when the
+                    <strong>Property Custodian</strong> account prints them — every other role keeps using the General header.
+                    Until you save it for the first time, the form below is seeded with the General header values.
                 </div>
 
-                <div class="form-group-grid">
-                    <div>
-                        <label class="form-label" for="school_name">Name of School *</label>
-                        <input type="text" id="school_name" name="school_name" class="form-control w-full" value="<?= htmlspecialchars($settings['school_name']) ?>" required>
+                <!-- Interactive Letterhead Live Preview -->
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <span class="text-sm font-semibold text-gray-500 uppercase"><i class="fas fa-eye me-1"></i> Live Interactive Preview</span>
+                        <span class="badge <?= $pc_configured ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-dark border border-warning-subtle' ?> font-medium text-xs">
+                            <?= $pc_configured ? 'Configured for Property Custodian' : 'Not configured yet — seeded from General' ?>
+                        </span>
                     </div>
-                    <div>
-                        <label class="form-label" for="address">Address *</label>
-                        <input type="text" id="address" name="address" class="form-control w-full" value="<?= htmlspecialchars($settings['address']) ?>" required>
-                    </div>
-                </div>
 
-                <!-- Contact Information -->
-                <div class="form-section-title">
-                    <i class="fas fa-phone-alt me-2"></i> Contact Details
-                </div>
+                    <div class="preview-paper">
+                        <div class="letterhead-container">
+                            <img id="pc-preview-logo" class="letterhead-logo" src="../<?= htmlspecialchars($pc_settings['logo_path']) ?>" alt="School Logo" onerror="this.src='../assets/images/logo.png'">
+                            <div class="letterhead-details">
+                                <h2 style="font-family: arial;" id="pc-preview-school-name" class="letterhead-title"><?= htmlspecialchars(strtoupper($pc_settings['school_name'])) ?></h2>
+                                <p id="pc-preview-address" class="letterhead-text"><?= htmlspecialchars($pc_settings['address']) ?></p>
+                                <p id="pc-preview-telefax" class="letterhead-subtext">
+                                    <?php
+                                    $pc_tel_fax = [];
+                                    if (!empty($pc_settings['telephone_number'])) $pc_tel_fax[] = 'Tel. No. ' . $pc_settings['telephone_number'];
+                                    if (!empty($pc_settings['fax_number'])) $pc_tel_fax[] = 'Fax No. ' . $pc_settings['fax_number'];
+                                    if (!empty($pc_settings['mobile_number'])) $pc_tel_fax[] = 'Mobile: ' . $pc_settings['mobile_number'];
+                                    echo htmlspecialchars(implode(' / ', $pc_tel_fax));
+                                    ?>
+                                </p>
+                            </div>
+                        </div>
 
-                <div class="form-group-grid col-3">
-                    <div>
-                        <label class="form-label" for="telephone_number">Telephone Number</label>
-                        <input type="text" id="telephone_number" name="telephone_number" class="form-control w-full" value="<?= htmlspecialchars($settings['telephone_number']) ?>" placeholder="e.g. (082) 291-1882">
-                    </div>
-                    <div>
-                        <label class="form-label" for="fax_number">Fax Number</label>
-                        <input type="text" id="fax_number" name="fax_number" class="form-control w-full" value="<?= htmlspecialchars($settings['fax_number']) ?>" placeholder="e.g. (082) 291-2053">
-                    </div>
-                    <div>
-                        <label class="form-label" for="mobile_number">Mobile Number</label>
-                        <input type="text" id="mobile_number" name="mobile_number" class="form-control w-full" value="<?= htmlspecialchars($settings['mobile_number']) ?>" placeholder="e.g. +639123456789">
-                    </div>
-                </div>
-
-                <div class="form-group-grid">
-                    <div>
-                        <label class="form-label" for="email_address">Email Address</label>
-                        <input type="email" id="email_address" name="email_address" class="form-control w-full" value="<?= htmlspecialchars($settings['email_address']) ?>" placeholder="e.g. info@school.edu.ph">
-                    </div>
-                    <div>
-                        <label class="form-label" for="website">Website URL</label>
-                        <input type="text" id="website" name="website" class="form-control w-full" value="<?= htmlspecialchars($settings['website']) ?>" placeholder="e.g. www.school.edu.ph">
+                        <div class="letterhead-banner">
+                            <span id="pc-preview-email"><i class="fas fa-envelope"></i> Email Address: <?= htmlspecialchars($pc_settings['email_address']) ?></span>
+                            <span id="pc-preview-website"><i class="fas fa-globe"></i> Website: <?= htmlspecialchars($pc_settings['website']) ?></span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Logo Uploader -->
-                <div class="form-section-title">
-                    <i class="fas fa-image me-2"></i> School Logo
+                <!-- Configuration Settings Form -->
+                <div class="settings-card">
+                    <form action="printer_header.php" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+                        <input type="hidden" name="header_role" value="property_custodian">
+
+                        <!-- School Profile Details -->
+                        <div class="form-section-title">
+                            <i class="fas fa-school me-2"></i> School Information
+                        </div>
+
+                        <div class="form-group-grid">
+                            <div>
+                                <label class="form-label" for="pc_school_name">Name of School *</label>
+                                <input type="text" id="pc_school_name" name="school_name" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['school_name']) ?>" required>
+                            </div>
+                            <div>
+                                <label class="form-label" for="pc_address">Address *</label>
+                                <input type="text" id="pc_address" name="address" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['address']) ?>" required>
+                            </div>
+                        </div>
+
+                        <!-- Contact Information -->
+                        <div class="form-section-title">
+                            <i class="fas fa-phone-alt me-2"></i> Contact Details
+                        </div>
+
+                        <div class="form-group-grid col-3">
+                            <div>
+                                <label class="form-label" for="pc_telephone_number">Telephone Number</label>
+                                <input type="text" id="pc_telephone_number" name="telephone_number" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['telephone_number']) ?>" placeholder="e.g. (082) 291-1882">
+                            </div>
+                            <div>
+                                <label class="form-label" for="pc_fax_number">Fax Number</label>
+                                <input type="text" id="pc_fax_number" name="fax_number" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['fax_number']) ?>" placeholder="e.g. (082) 291-2053">
+                            </div>
+                            <div>
+                                <label class="form-label" for="pc_mobile_number">Mobile Number</label>
+                                <input type="text" id="pc_mobile_number" name="mobile_number" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['mobile_number']) ?>" placeholder="e.g. +639123456789">
+                            </div>
+                        </div>
+
+                        <div class="form-group-grid">
+                            <div>
+                                <label class="form-label" for="pc_email_address">Email Address</label>
+                                <input type="email" id="pc_email_address" name="email_address" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['email_address']) ?>" placeholder="e.g. info@school.edu.ph">
+                            </div>
+                            <div>
+                                <label class="form-label" for="pc_website">Website URL</label>
+                                <input type="text" id="pc_website" name="website" class="form-control w-full" value="<?= htmlspecialchars($pc_settings['website']) ?>" placeholder="e.g. www.school.edu.ph">
+                            </div>
+                        </div>
+
+                        <!-- Logo Uploader -->
+                        <div class="form-section-title">
+                            <i class="fas fa-image me-2"></i> School Logo
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">School Logo Image</label>
+                            <div class="file-upload-wrapper">
+                                <i class="fas fa-cloud-upload-alt file-upload-icon"></i>
+                                <div class="file-upload-text">Drag and drop your logo file here, or click to browse</div>
+                                <div class="file-upload-subtext">Supported formats: PNG, JPG, JPEG (Max 2MB)</div>
+                                <input type="file" id="pc_logo" name="logo" class="file-upload-input" accept="image/png, image/jpeg, image/jpg">
+                            </div>
+                            <div id="pc-file-selected-name" class="text-xs text-gray-500 mt-2 font-medium" style="display: none;"></div>
+                        </div>
+
+                        <!-- Action Button -->
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn-submit">
+                                <i class="fas fa-save me-2"></i> Save Property Custodian Header
+                            </button>
+                        </div>
+                    </form>
                 </div>
 
-                <div class="mb-4">
-                    <label class="form-label">School Logo Image</label>
-                    <div class="file-upload-wrapper">
-                        <i class="fas fa-cloud-upload-alt file-upload-icon"></i>
-                        <div class="file-upload-text">Drag and drop your logo file here, or click to browse</div>
-                        <div class="file-upload-subtext">Supported formats: PNG, JPG, JPEG (Max 2MB)</div>
-                        <input type="file" id="logo" name="logo" class="file-upload-input" accept="image/png, image/jpeg, image/jpg">
-                    </div>
-                    <div id="file-selected-name" class="text-xs text-gray-500 mt-2 font-medium" style="display: none;"></div>
-                </div>
-
-                <!-- Action Button -->
-                <div class="text-end mt-4">
-                    <button type="submit" class="btn-submit">
-                        <i class="fas fa-save me-2"></i> Save Settings
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
 
     </div>
@@ -605,68 +878,79 @@ if (!$settings) {
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const schoolNameInput = document.getElementById('school_name');
-        const addressInput = document.getElementById('address');
-        const telInput = document.getElementById('telephone_number');
-        const faxInput = document.getElementById('fax_number');
-        const mobileInput = document.getElementById('mobile_number');
-        const emailInput = document.getElementById('email_address');
-        const websiteInput = document.getElementById('website');
-        const logoInput = document.getElementById('logo');
-        const fileSelectedName = document.getElementById('file-selected-name');
+        // Bind one live-preview set. `prefix` is '' for the General tab and
+        // 'pc_' for the Property Custodian tab (input and preview ids).
+        function bindHeaderPreview(prefix) {
+            const el = (suffix) => document.getElementById(prefix + suffix);
 
-        const previewName = document.getElementById('preview-school-name');
-        const previewAddress = document.getElementById('preview-address');
-        const previewTelefax = document.getElementById('preview-telefax');
-        const previewEmail = document.getElementById('preview-email');
-        const previewWebsite = document.getElementById('preview-website');
-        const previewLogo = document.getElementById('preview-logo');
+            const schoolNameInput = el('school_name');
+            if (!schoolNameInput) return;
 
-        function updatePreview() {
-            previewName.textContent = schoolNameInput.value.toUpperCase();
-            previewAddress.textContent = addressInput.value;
+            const addressInput = el('address');
+            const telInput = el('telephone_number');
+            const faxInput = el('fax_number');
+            const mobileInput = el('mobile_number');
+            const emailInput = el('email_address');
+            const websiteInput = el('website');
+            const logoInput = el('logo');
+            const fileSelectedName = el('file-selected-name');
 
-            let telefaxParts = [];
-            if (telInput.value.trim() !== '') {
-                telefaxParts.push('Tel. No. ' + telInput.value.trim());
+            const previewName = el('preview-school-name');
+            const previewAddress = el('preview-address');
+            const previewTelefax = el('preview-telefax');
+            const previewEmail = el('preview-email');
+            const previewWebsite = el('preview-website');
+            const previewLogo = el('preview-logo');
+
+            function updatePreview() {
+                previewName.textContent = schoolNameInput.value.toUpperCase();
+                previewAddress.textContent = addressInput.value;
+
+                let telefaxParts = [];
+                if (telInput.value.trim() !== '') {
+                    telefaxParts.push('Tel. No. ' + telInput.value.trim());
+                }
+                if (faxInput.value.trim() !== '') {
+                    telefaxParts.push('Fax No. ' + faxInput.value.trim());
+                }
+                if (mobileInput.value.trim() !== '') {
+                    telefaxParts.push('Mobile: ' + mobileInput.value.trim());
+                }
+                previewTelefax.textContent = telefaxParts.join(' / ');
+
+                previewEmail.innerHTML = '<i class="fas fa-envelope"></i> Email Address: ' + emailInput.value.trim();
+                previewWebsite.innerHTML = '<i class="fas fa-globe"></i> Website: ' + websiteInput.value.trim();
             }
-            if (faxInput.value.trim() !== '') {
-                telefaxParts.push('Fax No. ' + faxInput.value.trim());
-            }
-            if (mobileInput.value.trim() !== '') {
-                telefaxParts.push('Mobile: ' + mobileInput.value.trim());
-            }
-            previewTelefax.textContent = telefaxParts.join(' / ');
 
-            previewEmail.innerHTML = '<i class="fas fa-envelope"></i> Email Address: ' + emailInput.value.trim();
-            previewWebsite.innerHTML = '<i class="fas fa-globe"></i> Website: ' + websiteInput.value.trim();
+            schoolNameInput.addEventListener('input', updatePreview);
+            addressInput.addEventListener('input', updatePreview);
+            telInput.addEventListener('input', updatePreview);
+            faxInput.addEventListener('input', updatePreview);
+            mobileInput.addEventListener('input', updatePreview);
+            emailInput.addEventListener('input', updatePreview);
+            websiteInput.addEventListener('input', updatePreview);
+
+            // Preview logo as soon as selected
+            logoInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    // Show file name
+                    fileSelectedName.textContent = "Selected: " + file.name + " (" + (file.size / 1024 / 1024).toFixed(2) + " MB)";
+                    fileSelectedName.style.display = 'block';
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewLogo.src = e.target.result;
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    fileSelectedName.style.display = 'none';
+                }
+            });
         }
 
-        schoolNameInput.addEventListener('input', updatePreview);
-        addressInput.addEventListener('input', updatePreview);
-        telInput.addEventListener('input', updatePreview);
-        faxInput.addEventListener('input', updatePreview);
-        mobileInput.addEventListener('input', updatePreview);
-        emailInput.addEventListener('input', updatePreview);
-        websiteInput.addEventListener('input', updatePreview);
-
-        // Preview logo as soon as selected
-        logoInput.addEventListener('change', function() {
-            const file = this.files[0];
-            if (file) {
-                // Show file name
-                fileSelectedName.textContent = "Selected: " + file.name + " (" + (file.size / 1024 / 1024).toFixed(2) + " MB)";
-                fileSelectedName.style.display = 'block';
-
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewLogo.src = e.target.result;
-                }
-                reader.readAsDataURL(file);
-            } else {
-                fileSelectedName.style.display = 'none';
-            }
-        });
+        bindHeaderPreview('');     // General header tab
+        bindHeaderPreview('pc_');  // Property Custodian header tab
     });
 </script>
 
