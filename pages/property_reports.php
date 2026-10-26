@@ -16,6 +16,19 @@ if (!in_array($user_type, ['propertycustodian', 'admin'])) {
 $header_query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 1");
 $print_header = $header_query->fetch_assoc();
 
+// Role-aware letterhead: when the Property Custodian account prints their
+// reports, use the dedicated Property Custodian header (row 2) if it has
+// been configured on the Printer Header Settings page; every other role
+// keeps the General header (row 1).
+$__pc_role = str_replace([' ', '-'], '', strtolower($_SESSION['user_type'] ?? ($_SESSION['user']['user_type'] ?? '')));
+if ($__pc_role === 'propertycustodian') {
+    $__pc_query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 2");
+    $__pc_header = $__pc_query ? $__pc_query->fetch_assoc() : null;
+    if ($__pc_header && trim((string)($__pc_header['school_name'] ?? '')) !== '') {
+        $print_header = $__pc_header;
+    }
+}
+
 $category_list = [];
 $r = $conn->query("SELECT DISTINCT category FROM property_inventory WHERE receiver='Property Custodian' AND category IS NOT NULL AND category!='' ORDER BY category ASC");
 if ($r) while ($c = $r->fetch_assoc()) $category_list[] = $c['category'];
