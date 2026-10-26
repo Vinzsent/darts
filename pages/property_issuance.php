@@ -7,6 +7,24 @@ include '../includes/header.php';
 $user_type = $_SESSION['user_type'] ?? '';
 $dashboard_link = ($user_type == 'Admin') ? '../dashboard.php' : '../dashboard.php';
 
+// Fetch printer header settings for the printed letterhead
+$header_query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 1");
+$print_header = $header_query ? $header_query->fetch_assoc() : null;
+
+// Role-aware letterhead: when the Property Custodian account prints the
+// Issuance/Transfer Slip, use the dedicated Property Custodian header
+// (row 2, configured on the Printer Header Settings page) if it exists;
+// every other role keeps the General header (row 1).
+$__pc_role = str_replace([' ', '-'], '', strtolower($_SESSION['user_type'] ?? ($_SESSION['user']['user_type'] ?? '')));
+$pl_show_role = ($__pc_role === 'propertycustodian');
+if ($__pc_role === 'propertycustodian') {
+    $__pc_query = $conn->query("SELECT * FROM printer_header_settings WHERE id = 2");
+    $__pc_header = $__pc_query ? $__pc_query->fetch_assoc() : null;
+    if ($__pc_header && trim((string)($__pc_header['school_name'] ?? '')) !== '') {
+        $print_header = $__pc_header;
+    }
+}
+
 // Get inventory items for dropdown
 $inventory_sql = "SELECT i.*, s.supplier_name 
                   FROM inventory i 
@@ -427,6 +445,120 @@ if (isset($_SESSION['error'])) {
         transform: translateY(-2px);
     }
 
+    /* Printed Letterhead (Property Custodian / General header) */
+    .print-letterhead {
+        margin-bottom: 14px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Letterhead: logo pinned to the first position (left) with its
+       accreditation caption; a document-control square sits on the right,
+       opposite the logo. The balanced 3-column grid keeps the text truly
+       page-centered, and the left/right padding adds an indention. */
+    .print-letterhead .pl-top {
+        display: grid;
+        grid-template-columns: 130px 1fr 130px;
+        align-items: start;
+        text-align: center;
+        gap: 8px;
+        padding: 0 15px;
+    }
+
+    .print-letterhead .pl-logo-block {
+        grid-column: 1;
+        text-align: center;
+    }
+
+    .print-letterhead .pl-logo {
+        width: 78px;
+        height: 78px;
+        object-fit: contain;
+    }
+
+    .print-letterhead .pl-accredited {
+        font-size: 7.5px;
+        font-weight: 700;
+        color: #073b1d;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
+        margin-top: 3px;
+    }
+
+    /* Document-control square (top-right, opposite the logo) */
+    .print-letterhead .pl-doc-box {
+        grid-column: 3;
+        justify-self: end;
+        align-self: start;
+        width: 120px;
+        min-height: 64px;
+        border: 1.5px solid #073b1d;
+        border-radius: 4px;
+        background: #fff;
+        color: #073b1d;
+        padding: 6px 5px;
+        font-size: 8px;
+        line-height: 1.5;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .print-letterhead .pl-doc-box div {
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    .print-letterhead .pl-details {
+        grid-column: 2;
+        min-width: 0;
+        text-align: center;
+    }
+
+    .print-letterhead .pl-school {
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+        font-size: 22px;
+        line-height: 1.15;
+        color: #073b1d;
+        letter-spacing: 0.5px;
+    }
+
+    .print-letterhead .pl-role {
+        font-size: 12.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #073b1d;
+        margin-top: 3px;
+    }
+
+    .print-letterhead .pl-address {
+        font-size: 11px;
+        color: #333;
+        margin: 4px 0 0 0;
+    }
+
+    .print-letterhead .pl-contacts {
+        font-size: 10px;
+        color: #555;
+        margin-top: 1px;
+    }
+
+    .print-letterhead .pl-banner {
+        display: flex;
+        justify-content: center;
+        gap: 28px;
+        background: #073b1d;
+        color: #ffffff;
+        padding: 4px 10px;
+        font-size: 9px;
+        border-radius: 3px;
+        margin-top: 10px;
+        text-align: center;
+    }
+
     /* Print Styles */
     @media print {
         @page {
@@ -749,6 +881,43 @@ if (isset($_SESSION['error'])) {
 
     <!-- Print Layout (Hidden by default, shown only when printing) -->
     <div class="print-container" style="display: none;">
+        <?php if ($print_header): ?>
+        <!-- Letterhead: Property Custodian header when the custodian prints,
+             General header for everyone else -->
+        <div class="print-letterhead">
+            <div class="pl-top">
+                <div class="pl-logo-block">
+                    <img class="pl-logo" src="../<?= htmlspecialchars($print_header['logo_path']) ?>" alt="Logo" onerror="this.style.display='none'">
+                    <div class="pl-accredited">ACSCU-ACI-ACCREDITED</div>
+                </div>
+                <div class="pl-details">
+                    <div class="pl-school"><?= htmlspecialchars(strtoupper($print_header['school_name'])) ?></div>
+                    <?php if (!empty($pl_show_role)): ?>
+                    <div class="pl-role">Property Custodian</div>
+                    <?php endif; ?>
+                    <div class="pl-address"><?= htmlspecialchars($print_header['address']) ?></div>
+                    <div class="pl-contacts">
+                        <?php
+                        $pl_contacts = [];
+                        if (!empty($print_header['telephone_number'])) $pl_contacts[] = 'Tel. No. ' . $print_header['telephone_number'];
+                        if (!empty($print_header['fax_number'])) $pl_contacts[] = 'Fax No. ' . $print_header['fax_number'];
+                        if (!empty($print_header['mobile_number'])) $pl_contacts[] = 'Mobile: ' . $print_header['mobile_number'];
+                        echo htmlspecialchars(implode(' / ', $pl_contacts));
+                        ?>
+                    </div>
+                </div>
+                <div class="pl-doc-box">
+                    <div><strong>PC-003</strong></div>
+                    <div>Revision: 4</div>
+                    <div>Date Revised: July 2025</div>
+                </div>
+            </div>
+            <div class="pl-banner">
+                <span>Email Address: <?= htmlspecialchars($print_header['email_address'] ?? '') ?></span>
+                <span>Website: <?= htmlspecialchars($print_header['website'] ?? '') ?></span>
+            </div>
+        </div>
+        <?php endif; ?>
         <h2 class="print-title">Property Issuance/Transfer Slip</h2>
 
         <div class="print-info">
