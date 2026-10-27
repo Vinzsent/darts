@@ -4022,10 +4022,11 @@ if ($categories_result && $categories_result->num_rows > 0) {
             </script>
         <?php endif; ?>
 
-        <script src="../assets/js/print_all_stock_qr.js"></script>
-
         <?php
         if (!$isAjax) {
+            // Page view only: keep the ajax=1 table response free of the
+            // shared Print-All-QR <script> tag.
+            echo '<script src="../assets/js/print_all_stock_qr.js"></script>';
             include '../includes/footer.php';
         } else {
             // For AJAX requests, output only the table content
