@@ -33,6 +33,21 @@ function parse_school_year_range($raw)
     return [null, null];
 }
 
+// Compact pagination window: at most 5 page numbers, sliding so the
+// current page stays near the middle (clamped at the edges).
+if (!function_exists('pagination_window')) {
+    function pagination_window($current, $total)
+    {
+        $current = max(1, (int)$current);
+        $total = max(1, (int)$total);
+        if ($total <= 5) {
+            return range(1, $total);
+        }
+        $start = max(1, min($current - 2, $total - 4));
+        return range($start, $start + 4);
+    }
+}
+
 // Per-table School Year search values
 $sy_inv_raw  = $_GET['sy_inv']  ?? '';
 $sy_recv_raw = $_GET['sy_recv'] ?? '';
@@ -1057,15 +1072,29 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                 <nav>
                                     <ul class="pagination pagination-sm" id="paginationContainer">
                                         <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="#" onclick="loadInventoryItems(<?= $page - 1 ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;">Previous</a>
+                                            <a class="page-link" href="#" onclick="loadInventoryItems(<?= max(1, $page - 1) ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;">Previous</a>
                                         </li>
-                                        <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                                            <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                                                <a class="page-link" href="#" onclick="loadInventoryItems(<?= $i ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;"><?= $i ?></a>
+                                        <?php
+                                        // Compact window: max 5 page numbers + first/last shortcuts
+                                        $pg_pages = pagination_window($page, $total_pages);
+                                        $pg_first = reset($pg_pages);
+                                        $pg_last = end($pg_pages);
+                                        ?>
+                                        <?php if ($pg_first > 1): ?>
+                                            <li class="page-item"><a class="page-link" href="#" onclick="loadInventoryItems(1, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;">1</a></li>
+                                            <?php if ($pg_first > 2): ?><li class="page-item disabled"><span class="page-link">&hellip;</span></li><?php endif; ?>
+                                        <?php endif; ?>
+                                        <?php foreach ($pg_pages as $pg_i): ?>
+                                            <li class="page-item <?= ($pg_i == $page) ? 'active' : '' ?>">
+                                                <a class="page-link" href="#" onclick="loadInventoryItems(<?= $pg_i ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;"><?= $pg_i ?></a>
                                             </li>
-                                        <?php endfor; ?>
+                                        <?php endforeach; ?>
+                                        <?php if ($pg_last < $total_pages): ?>
+                                            <?php if ($pg_last < $total_pages - 1): ?><li class="page-item disabled"><span class="page-link">&hellip;</span></li><?php endif; ?>
+                                            <li class="page-item"><a class="page-link" href="#" onclick="loadInventoryItems(<?= $total_pages ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;"><?= $total_pages ?></a></li>
+                                        <?php endif; ?>
                                         <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="#" onclick="loadInventoryItems(<?= $page + 1 ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;">Next</a>
+                                            <a class="page-link" href="#" onclick="loadInventoryItems(<?= min($total_pages, $page + 1) ?>, document.getElementById('search').value, document.getElementById('sy_inv').value); return false;">Next</a>
                                         </li>
                                     </ul>
                                 </nav>
@@ -1134,7 +1163,7 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                             <td><?= date('M d, Y H:i', strtotime($log['date_created'])) ?></td>
                                             <td><?= htmlspecialchars($log['item_name']) ?></td>
                                             <td>
-                                                <span class="badge bg-<?= $log['movement_type'] == 'IN' ? 'success' : 'warning' ?>">
+                                                <span class="badge bg-<?= $log['movement_type'] == 'IN' ? 'success' : 'danger' ?>">
                                                     <?= $log['movement_type'] ?>
                                                 </span>
                                             </td>
@@ -1177,28 +1206,29 @@ if ($categories_result && $categories_result->num_rows > 0) {
                                         </li>
 
                                         <?php
-                                        // Smart pagination - show max 7 page numbers
-                                        $start_page = max(1, $logs_page - 3);
-                                        $end_page = min($total_logs_pages, $logs_page + 3);
+                                        // Compact window: max 5 page numbers + first/last shortcuts
+                                        $pg_pages = pagination_window($logs_page, $total_logs_pages);
+                                        $pg_first = reset($pg_pages);
+                                        $pg_last = end($pg_pages);
 
-                                        if ($start_page > 1) {
+                                        if ($pg_first > 1) {
                                             echo '<li class="page-item"><a class="page-link" href="#" onclick="loadStockMovements(1, document.getElementById(\'sy_logs\').value, document.getElementById(\'item_search\').value); return false;">1</a></li>';
-                                            if ($start_page > 2) {
+                                            if ($pg_first > 2) {
                                                 echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                                             }
                                         }
 
-                                        for ($i = $start_page; $i <= $end_page; $i++):
+                                        foreach ($pg_pages as $i):
                                             $is_active = ($i === $logs_page);
                                         ?>
                                             <li class="page-item <?= $is_active ? 'active' : '' ?>">
                                                 <a class="page-link" href="#" onclick="loadStockMovements(<?= $i ?>, document.getElementById('sy_logs').value, document.getElementById('item_search').value); return false;"><?= $i ?></a>
                                             </li>
                                         <?php
-                                        endfor;
+                                        endforeach;
 
-                                        if ($end_page < $total_logs_pages) {
-                                            if ($end_page < $total_logs_pages - 1) {
+                                        if ($pg_last < $total_logs_pages) {
+                                            if ($pg_last < $total_logs_pages - 1) {
                                                 echo '<li class="page-item disabled"><span class="page-link">...</span></li>';
                                             }
                                             echo '<li class="page-item"><a class="page-link" href="#" onclick="loadStockMovements(' . $total_logs_pages . ', document.getElementById(\'sy_logs\').value, document.getElementById(\'item_search\').value); return false;">' . $total_logs_pages . '</a></li>';
@@ -1221,8 +1251,9 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 </div>
 
 
-                <!-- Acquired Supplies -->
-                <div class="table-container">
+                <!-- Acquired Supplies — HIDDEN for now (will be re-enabled in the future);
+                     to bring it back, remove the inline display:none below -->
+                <div class="table-container" style="display: none;">
                     <div class="table-header p-2 px-3">
                         <h3>Acquired Supplies</h3>
                         <form method="GET" class="d-flex align-items-end gap-1">
@@ -2888,10 +2919,12 @@ if ($categories_result && $categories_result->num_rows > 0) {
             </script>
         <?php endif; ?>
 
-        <script src="../assets/js/print_all_stock_qr.js"></script>
-
         <?php
         if (!$isAjax) {
+            // Page view only: the shared Print-All-QR script must never be
+            // printed in the ajax=1 JSON response (a stray <script> tag before
+            // the JSON breaks response.json() with "Unexpected token '<'").
+            echo '<script src="../assets/js/print_all_stock_qr.js"></script>';
             include '../includes/footer.php';
         } else {
             // For AJAX requests, output JSON response
@@ -2990,13 +3023,31 @@ if ($categories_result && $categories_result->num_rows > 0) {
                 if ($total_pages > 1) {
                     echo '<nav><ul class="pagination pagination-sm" id="paginationContainer">';
                     echo '<li class="page-item ' . (($page <= 1) ? 'disabled' : '') . '">';
-                    echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . ($page - 1) . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">Previous</a></li>';
-                    for ($i = 1; $i <= $total_pages; $i++) {
-                        echo '<li class="page-item ' . (($i == $page) ? 'active' : '') . '">';
-                        echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . $i . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">' . $i . '</a></li>';
+                    echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . max(1, $page - 1) . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">Previous</a></li>';
+
+                    // Compact window: max 5 page numbers + first/last shortcuts
+                    $pg_pages = pagination_window($page, $total_pages);
+                    $pg_first = reset($pg_pages);
+                    $pg_last = end($pg_pages);
+                    if ($pg_first > 1) {
+                        echo '<li class="page-item"><a class="page-link" href="#" onclick="loadInventoryItems(1, document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">1</a></li>';
+                        if ($pg_first > 2) {
+                            echo '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+                        }
                     }
+                    foreach ($pg_pages as $pg_i) {
+                        echo '<li class="page-item ' . (($pg_i == $page) ? 'active' : '') . '">';
+                        echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . $pg_i . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">' . $pg_i . '</a></li>';
+                    }
+                    if ($pg_last < $total_pages) {
+                        if ($pg_last < $total_pages - 1) {
+                            echo '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+                        }
+                        echo '<li class="page-item"><a class="page-link" href="#" onclick="loadInventoryItems(' . $total_pages . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">' . $total_pages . '</a></li>';
+                    }
+
                     echo '<li class="page-item ' . (($page >= $total_pages) ? 'disabled' : '') . '">';
-                    echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . ($page + 1) . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">Next</a></li>';
+                    echo '<a class="page-link" href="#" onclick="loadInventoryItems(' . min($total_pages, $page + 1) . ', document.getElementById(\'search\').value, document.getElementById(\'sy_inv\').value); return false;">Next</a></li>';
                     echo '</ul></nav>';
                 }
                 echo '</div>';
