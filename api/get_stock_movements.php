@@ -1,6 +1,23 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include '../includes/db.php';
+
+// Compact pagination window: at most 5 page numbers, sliding so the
+// current page stays near the middle (clamped at the edges).
+if (!function_exists('pagination_window')) {
+    function pagination_window($current, $total)
+    {
+        $current = max(1, (int)$current);
+        $total = max(1, (int)$total);
+        if ($total <= 5) {
+            return range(1, $total);
+        }
+        $start = max(1, min($current - 2, $total - 4));
+        return range($start, $start + 4);
+    }
+}
 
 // ANCHOR: AJAX endpoint for fetching filtered stock movements
 header('Content-Type: application/json');
@@ -70,7 +87,7 @@ try {
     if ($stock_logs_result && $stock_logs_result->num_rows > 0) {
         $has_data = true;
         while ($log = $stock_logs_result->fetch_assoc()) {
-            $badge_class = $log['movement_type'] == 'IN' ? 'success' : 'warning';
+            $badge_class = $log['movement_type'] == 'IN' ? 'success' : 'danger';
             $table_rows .= '<tr>';
             $table_rows .= '<td>' . date('M d, Y H:i', strtotime($log['date_created'])) . '</td>';
             $table_rows .= '<td>' . htmlspecialchars($log['item_name']) . '</td>';
@@ -112,40 +129,35 @@ try {
             $pagination_html .= '</li>';
         }
 
-        // Page numbers with sliding window
-        $neighborRange = 2;
-        $start = max(1, $logs_page - $neighborRange);
-        $end = min($total_logs_pages, $logs_page + $neighborRange);
+        // Page numbers with compact sliding window (max 5)
+        $pg_pages = pagination_window($logs_page, $total_logs_pages);
+        $pg_first = reset($pg_pages);
+        $pg_last = end($pg_pages);
 
-        // First page
-        $active_class = (1 === (int)$logs_page) ? ' active' : '';
-        $pagination_html .= '<li class="page-item' . $active_class . '">';
-        $pagination_html .= '<a class="page-link" href="#" onclick="loadStockMovements(1, \'' . htmlspecialchars($sy_logs_raw) . '\', \'' . htmlspecialchars($search_value) . '\'); return false;">1</a>';
-        $pagination_html .= '</li>';
-
-        // Leading ellipsis
-        if ($start > 2) {
-            $pagination_html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+        // First page shortcut
+        if ($pg_first > 1) {
+            $pagination_html .= '<li class="page-item">';
+            $pagination_html .= '<a class="page-link" href="#" onclick="loadStockMovements(1, \'' . htmlspecialchars($sy_logs_raw) . '\', \'' . htmlspecialchars($search_value) . '\'); return false;">1</a>';
+            $pagination_html .= '</li>';
+            if ($pg_first > 2) {
+                $pagination_html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+            }
         }
 
-        // Middle pages
-        for ($i = $start; $i <= $end; $i++) {
-            if ($i === 1 || $i === (int)$total_logs_pages) continue;
+        // Window pages
+        foreach ($pg_pages as $i) {
             $active_class = ($i == $logs_page ? ' active' : '');
             $pagination_html .= '<li class="page-item' . $active_class . '">';
             $pagination_html .= '<a class="page-link" href="#" onclick="loadStockMovements(' . $i . ', \'' . htmlspecialchars($sy_logs_raw) . '\', \'' . htmlspecialchars($search_value) . '\'); return false;">' . $i . '</a>';
             $pagination_html .= '</li>';
         }
 
-        // Trailing ellipsis
-        if ($end < ($total_logs_pages - 1)) {
-            $pagination_html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
-        }
-
-        // Last page
-        if ($total_logs_pages > 1) {
-            $active_class = ((int)$total_logs_pages === (int)$logs_page) ? ' active' : '';
-            $pagination_html .= '<li class="page-item' . $active_class . '">';
+        // Trailing ellipsis + last page shortcut
+        if ($pg_last < $total_logs_pages) {
+            if ($pg_last < $total_logs_pages - 1) {
+                $pagination_html .= '<li class="page-item disabled"><span class="page-link">&hellip;</span></li>';
+            }
+            $pagination_html .= '<li class="page-item">';
             $pagination_html .= '<a class="page-link" href="#" onclick="loadStockMovements(' . $total_logs_pages . ', \'' . htmlspecialchars($sy_logs_raw) . '\', \'' . htmlspecialchars($search_value) . '\'); return false;">' . $total_logs_pages . '</a>';
             $pagination_html .= '</li>';
         }
