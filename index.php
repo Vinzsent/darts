@@ -29,6 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
         if (password_verify($password, $user['password'])) {
+          // Session fixation hardening: issue a fresh session ID before populating
+          // session data (the session data itself survives the regeneration).
+          session_regenerate_id(true);
           // Store user data in session with proper keys
           $_SESSION['user'] = $user;
           $_SESSION['user_id'] = $user['id']; // Store user ID separately
