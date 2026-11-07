@@ -1,0 +1,7 @@
+.git
+.github
+.agent
+graphify-out
+php_server.log
+*.sql
+includes/db_config.local.php
