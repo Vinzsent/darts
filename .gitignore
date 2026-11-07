@@ -17,3 +17,6 @@
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Tooling cache (graphify code-graph output; regenerate anytime)
+graphify-out/
