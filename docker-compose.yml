@@ -1,0 +1,23 @@
+services:
+  darts-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: darts-app
+
+    restart: unless-stopped
+
+    ports:
+      - "192.168.1.2:8087:80"
+
+    volumes:
+      - ./includes/db_config.local.php:/var/www/html/includes/db_config.local.php:ro
+      - ./uploads:/var/www/html/uploads
+
+    networks:
+      - darts_net
+
+networks:
+  darts_net:
+    external: true
