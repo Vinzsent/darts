@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * Generate a QR code image for a purchase order and store it as a BLOB.
  *

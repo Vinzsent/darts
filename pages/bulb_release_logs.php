@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 $pageTitle = 'Aircon Condition Management';
 include '../includes/auth.php';
 include '../includes/db.php';
@@ -16,22 +17,6 @@ $user_type = $_SESSION['user_type'] ?? '';
 $dashboard_link = ($user_type == 'Admin') ? '../dashboard.php' : '../dashboard.php';
 
 // Helpers: parse School Year input into start/end dates (July 1 to June 30)
-function parse_school_year_range($raw)
-{
-    $raw = trim((string)$raw);
-    if ($raw === '') return [null, null];
-    if (preg_match('/^(20\d{2})\s*-\s*(20\d{2})$/', $raw, $m)) {
-        $startY = (int)$m[1];
-        $endY = (int)$m[2];
-        if ($endY === $startY + 1) {
-            return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $endY)];
-        }
-    } elseif (preg_match('/^(19|20)\d{2}$/', $raw)) {
-        $startY = (int)$raw;
-        return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $startY + 1)];
-    }
-    return [null, null];
-}
 
 // Per-table School Year search values
 $sy_inv_raw  = $_GET['sy_inv']  ?? '';

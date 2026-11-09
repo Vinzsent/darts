@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 // Export Bulb Release Logs to an Excel-compatible file
 // Exports all rows that match the same filters used in bulb_release_logs.php
 
@@ -6,22 +7,6 @@ include '../includes/auth.php';
 include '../includes/db.php';
 
 // Helper: parse School Year input into start/end dates (July 1 to June 30)
-function parse_school_year_range($raw)
-{
-    $raw = trim((string)$raw);
-    if ($raw === '') return [null, null];
-    if (preg_match('/^(20\d{2})\s*-\s*(20\d{2})$/', $raw, $m)) {
-        $startY = (int)$m[1];
-        $endY = (int)$m[2];
-        if ($endY === $startY + 1) {
-            return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $endY)];
-        }
-    } elseif (preg_match('/^(19|20)\d{2}$/', $raw)) {
-        $startY = (int)$raw;
-        return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $startY + 1)];
-    }
-    return [null, null];
-}
 
 // Read filters (mirror bulb_release_logs.php)
 $sy_inv_raw  = $_GET['sy_inv']  ?? '';

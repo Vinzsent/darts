@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 // Include database connection and auth
 include '../includes/auth.php';
 include '../includes/db.php';
@@ -7,24 +8,6 @@ include '../includes/db.php';
  * Parse school year string into start and end dates
  * Format: "2023-2024" -> ["2023-07-01", "2024-06-30"]
  */
-function parse_school_year_range($sy_string)
-{
-    if (empty($sy_string)) {
-        return [null, null];
-    }
-
-    if (preg_match('/^(\d{4})-(\d{4})$/', $sy_string, $matches)) {
-        $start_year = (int)$matches[1];
-        $end_year = (int)$matches[2];
-
-        $start_date = $start_year . '-07-01';
-        $end_date = $end_year . '-06-30';
-
-        return [$start_date, $end_date];
-    }
-
-    return [null, null];
-}
 
 // Get filter parameters
 $sy_logs_raw = $_GET['sy_logs'] ?? '';

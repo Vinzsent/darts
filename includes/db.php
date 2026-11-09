@@ -1,8 +1,21 @@
 <?php
-$host   = '127.0.0.1';
-$user   = 'root';
-$pass   = '';
+// ─── Database connection ─────────────────────────────────────────────────
+// Default local development credentials are set below. On the live server,
+// create includes/db_config.local.php (git-ignored via *.local.php) with:
+//   <?php
+//   $host = '...'; $user = '...'; $pass = '...'; $dbname = '...';
+// It is never committed and survives git pulls / resets on the server.
+
+$host = '127.0.0.1';
+$user = 'root';
+$pass = '';
 $dbname = 'darts';
+
+// Untracked override (wins over the defaults above when present)
+$configFile = __DIR__ . '/db_config.local.php';
+if (is_readable($configFile)) {
+    require $configFile;
+}
 
 mysqli_report(MYSQLI_REPORT_OFF);
 $conn = new mysqli($host, $user, $pass, $dbname);

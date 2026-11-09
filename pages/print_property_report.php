@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 include '../includes/auth.php';
 include '../includes/db.php';
 
@@ -8,7 +9,6 @@ if (!in_array($user_type, ['propertycustodian', 'admin'])) {
     http_response_code(403); exit('Access denied.');
 }
 
-function safe($conn, $v) { return $conn->real_escape_string(trim($v)); }
 
 $report_type = $_GET['report_type'] ?? 'inventory';
 

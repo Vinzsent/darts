@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 // Edit user action with visible error reporting (no more blank HTTP 500).
 // When called via AJAX (the edit modal uses fetch), responds with JSON.
 // On a normal form POST, renders a readable error page instead of dying blank.

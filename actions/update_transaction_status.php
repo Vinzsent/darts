@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 session_start();
 include '../includes/db.php';
 include '../includes/notification_helper.php';

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 // Suppress notices/warnings from leaking into CSV output
 error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
 ini_set('display_errors', '0');
@@ -7,22 +8,6 @@ include '../includes/auth.php';
 include '../includes/db.php';
 
 // Helper to parse school year into date range (July 1 to June 30)
-function parse_school_year_range($raw)
-{
-    $raw = trim((string)$raw);
-    if ($raw === '') return [null, null];
-    if (preg_match('/^(20\d{2})\s*-\s*(20\d{2})$/', $raw, $m)) {
-        $startY = (int)$m[1];
-        $endY = (int)$m[2];
-        if ($endY === $startY + 1) {
-            return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $endY)];
-        }
-    } elseif (preg_match('/^(19|20)\d{2}$/', $raw)) {
-        $startY = (int)$raw;
-        return [sprintf('%04d-07-01', $startY), sprintf('%04d-06-30', $startY + 1)];
-    }
-    return [null, null];
-}
 
 $fmt_date = function ($val) {
     if (empty($val) || $val === '0000-00-00' || $val === '0000-00-00 00:00:00') return '';

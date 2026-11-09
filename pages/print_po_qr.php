@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * Printable per-item QR codes for a purchase order.
  *

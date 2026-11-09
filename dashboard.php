@@ -5,6 +5,11 @@ include 'includes/auth.php';
 include 'includes/db.php';
 include 'includes/header.php';
 
+// CSRF token for the admin password prompt (verified by actions/verify_admin_password.php)
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Get user type from session and normalize it (remove spaces and hyphens, convert to lowercase)
 $raw_user_type = $_SESSION['user_type'] ?? $_SESSION['user']['user_type'] ?? '';
 $user_type = str_replace([' ', '-'], '', strtolower($raw_user_type));
@@ -1483,6 +1488,7 @@ if (in_array($user_type, ['purchasingofficer', 'purchasingstaff', 'purcashingsta
       <p class="text-muted">Please enter the admin password to access system settings</p>
     </div>
     <form id="passwordForm" method="POST" action="actions/verify_admin_password.php">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
       <div class="mb-4">
         <label for="adminPassword" class="form-label fw-bold">Admin Password:</label>
         <input type="password" class="form-control" id="adminPassword" name="admin_password" required placeholder="Enter admin password">

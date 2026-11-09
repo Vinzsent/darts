@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * Stream a purchase order's QR code as a PNG image.
  *

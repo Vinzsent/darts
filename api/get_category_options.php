@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * API endpoint to generate hierarchical category dropdown options
  * This generates the same structure as shown in the add_supply_request.php modal

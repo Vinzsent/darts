@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/auth.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -7,17 +9,7 @@ include '../includes/db.php';
 // Compact pagination window: at most 5 page numbers, sliding so the
 // current page stays near the middle (clamped at the edges).
 if (!function_exists('pagination_window')) {
-    function pagination_window($current, $total)
-    {
-        $current = max(1, (int)$current);
-        $total = max(1, (int)$total);
-        if ($total <= 5) {
-            return range(1, $total);
-        }
-        $start = max(1, min($current - 2, $total - 4));
-        return range($start, $start + 4);
     }
-}
 
 // ANCHOR: AJAX endpoint for fetching filtered stock movements
 header('Content-Type: application/json');
@@ -195,21 +187,3 @@ try {
  * Parse school year string into start and end dates
  * Format: "2023-2024" -> ["2023-07-01", "2024-06-30"]
  */
-function parse_school_year_range($sy_string)
-{
-    if (empty($sy_string)) {
-        return [null, null];
-    }
-
-    if (preg_match('/^(\d{4})-(\d{4})$/', $sy_string, $matches)) {
-        $start_year = (int)$matches[1];
-        $end_year = (int)$matches[2];
-
-        $start_date = $start_year . '-07-01';
-        $end_date = $end_year . '-06-30';
-
-        return [$start_date, $end_date];
-    }
-
-    return [null, null];
-}

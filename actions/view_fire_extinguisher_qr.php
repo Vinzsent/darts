@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * Stream one FIRE EXTINGUISHER's QR code as a PNG image.
  *

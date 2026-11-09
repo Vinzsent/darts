@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 /**
  * Printable QR label sheet for inventory / property stock rows.
  *

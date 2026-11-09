@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/auth.php';
 include '../includes/db.php';
 
 header('Content-Type: application/json');
@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'GET' && isset($_GET['inventory_id'])) {
     $sql = "SELECT pi.*, s.supplier_name 
     FROM aircons pi 
     LEFT JOIN supplier s ON pi.supplier_id = s.supplier_id 
-    WHERE pi.inventory_id = ?";
+    WHERE pi.aircon_id = ?";
     
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $inventory_id);

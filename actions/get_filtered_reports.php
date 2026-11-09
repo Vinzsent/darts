@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/helpers.php';
 include '../includes/auth.php';
 include '../includes/db.php';
 
@@ -11,7 +12,6 @@ if (!in_array($user_type, ['propertycustodian', 'admin'])) {
 $report_type = $_GET['report_type'] ?? 'inventory';
 
 // ─── HELPER ───────────────────────────────────────────────────────────────
-function safe($conn, $v) { return $conn->real_escape_string(trim($v)); }
 
 function renderPagination($total_rows, $limit, $page, $report_type) {
     $total_pages = ceil($total_rows / $limit);

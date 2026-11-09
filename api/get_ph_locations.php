@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/auth.php';
 // api/get_ph_locations.php
 header('Content-Type: application/json');
 
