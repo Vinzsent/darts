@@ -1,0 +1,16 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-darts
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, darts]
+    steps:
+      - name: Deploy
+        run: /opt/darts/deploy.sh
