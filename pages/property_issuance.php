@@ -25,13 +25,65 @@ if ($__pc_role === 'propertycustodian') {
     }
 }
 
-// Get inventory items for dropdown
-$inventory_sql = "SELECT i.*, s.supplier_name 
-                  FROM inventory i 
-                  LEFT JOIN supplier s ON i.supplier_id = s.supplier_id 
-                  WHERE i.current_stock > 0 
-                  ORDER BY i.item_name ASC";
-$inventory_result = $conn->query($inventory_sql);
+// ── Role-aware items for the issuance dropdown ──────────────────────────
+// Property Custodian -> their property inventory, Supply In-charge -> the
+// supply inventory, Admin (and any other role) -> items from BOTH
+// inventories. Each item key carries its source table so the receiving
+// end can tell them apart ("property:<id>" / "supply:<id>").
+$__role = str_replace([' ', '-'], '', strtolower($user_type));
+$issuance_items = [];
+
+if ($__role === 'propertycustodian') {
+    $q = $conn->query("SELECT inventory_id, item_name, description, current_stock
+                       FROM property_inventory
+                       WHERE (receiver = 'Property Custodian' OR receiver LIKE '%Property Custodian%')
+                         AND current_stock > 0
+                       ORDER BY item_name ASC");
+    if ($q) while ($r = $q->fetch_assoc()) {
+        $desc = ($r['description'] ?? '') !== '' ? $r['description'] : $r['item_name'];
+        $issuance_items[] = [
+            'key'   => 'property:' . (int)$r['inventory_id'],
+            'name'  => $r['item_name'],
+            'desc'  => $desc,
+            'stock' => (int)$r['current_stock'],
+            'tag'   => '',
+        ];
+    }
+} elseif ($__role === 'supplyincharge') {
+    $q = $conn->query("SELECT inventory_id, item_name, description, current_stock
+                       FROM inventory
+                       WHERE (receiver = 'Supply In-charge' OR receiver LIKE '%Supply In-charge%')
+                         AND current_stock > 0
+                       ORDER BY item_name ASC");
+    if ($q) while ($r = $q->fetch_assoc()) {
+        $desc = ($r['description'] ?? '') !== '' ? $r['description'] : $r['item_name'];
+        $issuance_items[] = [
+            'key'   => 'supply:' . (int)$r['inventory_id'],
+            'name'  => $r['item_name'],
+            'desc'  => $desc,
+            'stock' => (int)$r['current_stock'],
+            'tag'   => '',
+        ];
+    }
+} else {
+    // Admin / other roles: everything from both inventories, tagged by source
+    $q = $conn->query("(SELECT inventory_id, item_name, description, current_stock, 'property' AS src
+                        FROM property_inventory WHERE current_stock > 0)
+                       UNION ALL
+                       (SELECT inventory_id, item_name, description, current_stock, 'supply' AS src
+                       FROM inventory WHERE current_stock > 0)
+                       ORDER BY item_name ASC");
+    if ($q) while ($r = $q->fetch_assoc()) {
+        $desc = ($r['description'] ?? '') !== '' ? $r['description'] : $r['item_name'];
+        $issuance_items[] = [
+            'key'   => $r['src'] . ':' . (int)$r['inventory_id'],
+            'name'  => $r['item_name'],
+            'desc'  => $desc,
+            'stock' => (int)$r['current_stock'],
+            'tag'   => $r['src'] === 'property' ? '[Property]' : '[Supply]',
+        ];
+    }
+}
 
 // Get departments for dropdown
 $departments = [
@@ -809,15 +861,13 @@ if (isset($_SESSION['error'])) {
                                 <td>
                                     <select name="items[0][item_id]" class="item-select" required onchange="updateItemDescription(this, 0)">
                                         <option value="">Select Item</option>
-                                        <?php if ($inventory_result && $inventory_result->num_rows > 0): ?>
-                                            <?php while ($item = $inventory_result->fetch_assoc()): ?>
-                                                <option value="<?= $item['inventory_id'] ?>"
-                                                    data-description="<?= htmlspecialchars($item['description'] ?? $item['item_name']) ?>"
-                                                    data-stock="<?= $item['current_stock'] ?>">
-                                                    <?= htmlspecialchars($item['item_name']) ?> (Stock: <?= $item['current_stock'] ?>)
-                                                </option>
-                                            <?php endwhile; ?>
-                                        <?php endif; ?>
+                                            <?php foreach ($issuance_items as $item): ?>
+        <option value="<?= htmlspecialchars($item['key']) ?>"
+            data-description="<?= htmlspecialchars($item['desc']) ?>"
+            data-stock="<?= (int)$item['stock'] ?>">
+            <?= htmlspecialchars(($item['tag'] !== '' ? $item['tag'] . ' ' : '') . $item['name']) ?> (Stock: <?= (int)$item['stock'] ?>)
+        </option>
+    <?php endforeach; ?>
                                     </select>
                                 </td>
                                 <td><input type="text" name="items[0][description]" placeholder="Item description" readonly></td>
@@ -1036,6 +1086,22 @@ if (isset($_SESSION['error'])) {
 <script>
     let rowCount = 1;
 
+    let rowCount = 1;
+
+    // Role-aware item list (property / supply / both) from the server
+    const ISSUANCE_ITEMS = <?= json_encode($issuance_items, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+
+    function buildItemSelectOptions(selectEl) {
+        selectEl.innerHTML = '<option value="">Select Item</option>';
+        ISSUANCE_ITEMS.forEach(function(it) {
+            const opt = document.createElement('option');
+            opt.value = it.key;
+            opt.dataset.description = it.desc;
+            opt.dataset.stock = it.stock;
+            opt.textContent = (it.tag ? it.tag + ' ' : '') + it.name + ' (Stock: ' + it.stock + ')';
+            selectEl.appendChild(opt);
+        });
+    }
     // Add new item row
     function addItemRow() {
         const tbody = document.getElementById('itemsTableBody');
@@ -1046,21 +1112,6 @@ if (isset($_SESSION['error'])) {
             <td>
                 <select name="items[${rowCount}][item_id]" class="item-select" required onchange="updateItemDescription(this, ${rowCount})">
                     <option value="">Select Item</option>
-                    <?php
-                    if ($inventory_result) {
-                        $inventory_result->data_seek(0);
-                        while ($item = $inventory_result->fetch_assoc()):
-                    ?>
-                        <option value="<?= $item['inventory_id'] ?>" 
-                                data-description="<?= htmlspecialchars($item['description'] ?? $item['item_name']) ?>"
-                                data-stock="<?= $item['current_stock'] ?>">
-                            <?= htmlspecialchars($item['item_name']) ?> (Stock: <?= $item['current_stock'] ?>)
-                        </option>
-                    <?php
-                        endwhile;
-                    }
-                    ?>
-                </select>
             </td>
             <td><input type="text" name="items[${rowCount}][description]" placeholder="Item description" readonly></td>
             <td><input type="text" name="items[${rowCount}][serial_number]" placeholder="Serial number"></td>
@@ -1069,6 +1120,7 @@ if (isset($_SESSION['error'])) {
         `;
 
         tbody.appendChild(row);
+        buildItemSelectOptions(row.querySelector('select.item-select'));
         rowCount++;
     }
 
@@ -1105,21 +1157,6 @@ if (isset($_SESSION['error'])) {
                     <td>
                         <select name="items[0][item_id]" class="item-select" required onchange="updateItemDescription(this, 0)">
                             <option value="">Select Item</option>
-                            <?php
-                            if ($inventory_result) {
-                                $inventory_result->data_seek(0);
-                                while ($item = $inventory_result->fetch_assoc()):
-                            ?>
-                                <option value="<?= $item['inventory_id'] ?>" 
-                                        data-description="<?= htmlspecialchars($item['description'] ?? $item['item_name']) ?>"
-                                        data-stock="<?= $item['current_stock'] ?>">
-                                    <?= htmlspecialchars($item['item_name']) ?> (Stock: <?= $item['current_stock'] ?>)
-                                </option>
-                            <?php
-                                endwhile;
-                            }
-                            ?>
-                        </select>
                     </td>
                     <td><input type="text" name="items[0][description]" placeholder="Item description" readonly></td>
                     <td><input type="text" name="items[0][serial_number]" placeholder="Serial number"></td>
@@ -1128,6 +1165,7 @@ if (isset($_SESSION['error'])) {
                 </tr>
             `;
             rowCount = 1;
+            buildItemSelectOptions(document.querySelector('#itemsTableBody select.item-select'));
         }
     }
 

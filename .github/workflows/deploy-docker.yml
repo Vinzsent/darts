@@ -1,0 +1,68 @@
+name: Deploy Docker stack (/opt)
+
+# Runs on every push to main (alongside the Apache deploy in main.yml),
+# and can also be triggered manually from the Actions tab.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Queue deploys instead of racing when several pushes land together
+concurrency:
+  group: deploy-docker
+  cancel-in-progress: false
+
+jobs:
+  deploy-docker:
+    runs-on: self-hosted
+    steps:
+      - name: Deploy source to /opt/darts and rebuild the container
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            # ── Adjust this line if your Docker stack lives elsewhere ──
+            OPT_DIR="/opt/darts"
+            REPO_URL="https://github.com/Vinzsent/dcc-lib.git"
+            BRANCH="main"
+            # ────────────────────────────────────────────────────────────
+
+            echo "==> Deploying Docker stack in $OPT_DIR"
+
+            # First-time setup: clone the repo if the folder has no history
+            if [ ! -d "$OPT_DIR/.git" ]; then
+              echo "==> No git repo found - cloning..."
+              sudo mkdir -p "$OPT_DIR"
+              sudo git clone "$REPO_URL" "$OPT_DIR"
+            fi
+
+            cd "$OPT_DIR"
+
+            # Update source. Untracked files (includes/db_config.local.php,
+            # uploads/) survive the reset - git does not track them.
+            sudo git fetch origin "$BRANCH"
+            sudo git reset --hard "origin/$BRANCH"
+
+            # The compose file mounts this credential file read-only; the
+            # container cannot start without it. Guard with a clear message.
+            if [ ! -f "includes/db_config.local.php" ]; then
+              echo "ERROR: includes/db_config.local.php is missing in $OPT_DIR."
+              echo "Create it with the production DB credentials, then re-run this deploy:"
+              echo "  sudo nano $OPT_DIR/includes/db_config.local.php"
+              exit 1
+            fi
+
+            # Make sure the external network exists (idempotent)
+            sudo docker network create darts_net 2>/dev/null || true
+
+            # Rebuild the image with the updated code and restart the container
+            sudo docker compose up -d --build
+
+            # Show the running state
+            sudo docker compose ps
