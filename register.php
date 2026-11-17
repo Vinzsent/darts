@@ -1,5 +1,14 @@
-
 <?php
+// ─── Security guard (audit fix) ─────────────────────────────────────────────
+// Account creation is restricted to authenticated administrators.
+// The old open self-registration allowed ANY visitor to create an account
+// with an arbitrary user_type (including "admin") with no CSRF protection.
+require_once 'includes/auth.php';
+if (strtolower($_SESSION['user_type'] ?? '') !== 'admin') {
+    http_response_code(403);
+    exit('Forbidden');
+}
+
 include 'includes/db.php';
 
 $error = '';
@@ -39,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="container mt-5">
   <h2>Register</h2>
   <form method="POST" class="w-75">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
     <div class="row">
       <div class="col">
         <input class="form-control mb-2" name="title" placeholder="Title">
