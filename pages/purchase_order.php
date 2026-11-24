@@ -962,7 +962,10 @@ if ($offices_query && $offices_query->num_rows > 0) {
                     const unitCost = parseFloat(row.cells[4].querySelector('input')?.value) || 0;
                     const amount = quantity * unitCost;
 
-                    row.cells[5].textContent = '₱' + amount.toFixed(2);
+                    row.cells[5].textContent = '₱' + amount.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
 
                     calculateGrandTotal();
                 }
@@ -974,7 +977,7 @@ if ($offices_query && $offices_query->num_rows > 0) {
 
                     rows.forEach(row => {
                         const amountCell = row.cells[5] || row.querySelector('.amount-cell');
-                        const amountText = amountCell?.textContent.replace('₱', '').replace(',', '') || '0';
+                        const amountText = amountCell?.textContent.replace('₱', '').replace(/,/g, '') || '0';
                         const amount = parseFloat(amountText) || 0;
                         total += amount;
                     });
@@ -1059,15 +1062,20 @@ if ($offices_query && $offices_query->num_rows > 0) {
                         const amt = row.cells[5]?.textContent.replace('₱', '').trim() || '';
 
                         if (desc || qty || cost || (amt && amt !== '0.00')) {
+                            const parsedCost = cost !== '' ? parseFloat(cost.toString().replace(/,/g, '')) : NaN;
+                            const parsedAmt = amt !== '' ? parseFloat(amt.toString().replace(/,/g, '')) : NaN;
                             items.push({
                                 desc: desc,
                                 office: office,
                                 qty: qty,
-                                cost: cost ? parseFloat(cost).toLocaleString('en-US', {
+                                cost: !isNaN(parsedCost) ? parsedCost.toLocaleString('en-US', {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2
-                                }) : '',
-                                amount: amt && amt !== '0.00' ? amt : ''
+                                }) : (cost || ''),
+                                amount: !isNaN(parsedAmt) && parsedAmt !== 0 ? parsedAmt.toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                }) : (amt && amt !== '0.00' ? amt : '')
                             });
                         }
                     });
@@ -1295,7 +1303,11 @@ if ($offices_query && $offices_query->num_rows > 0) {
                                         }
                                         row.cells[3].querySelector('input').value = item.quantity;
                                         row.cells[4].querySelector('input').value = item.unit_cost;
-                                        row.cells[5].textContent = '₱' + item.line_total.toFixed(2);
+                                        const parsedLineTotal = parseFloat(item.line_total) || 0;
+                                        row.cells[5].textContent = '₱' + parsedLineTotal.toLocaleString('en-US', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        });
                                     }
                                 });
 
@@ -1678,7 +1690,10 @@ if ($offices_query && $offices_query->num_rows > 0) {
                     // Calculate and display total
                     const numQty = parseFloat(quantity) || 0;
                     const lineTotal = numQty * unitCost;
-                    newRow.cells[5].textContent = '₱' + lineTotal.toFixed(2);
+                    newRow.cells[5].textContent = '₱' + lineTotal.toLocaleString('en-US', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
 
                     // Recalculate grand total
                     calculateGrandTotal();
