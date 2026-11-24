@@ -1160,8 +1160,8 @@ $verifier_name = 'Marilou L. Suarez';
                     <td>${item.item_description}</td>
                     <td>${item.item_office ? String(item.item_office) : '<span class="text-muted" style="font-size:0.82rem;">&mdash;</span>'}</td>
                     <td>${qtyCell}</td>
-                    <td>₱${parseFloat(item.unit_cost).toFixed(2)}</td>
-                    <td>₱${parseFloat(item.line_total).toFixed(2)}</td>
+                    <td>₱${parseFloat(item.unit_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td>₱${parseFloat(item.line_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td>${recvDateStr ? `<span style="display:inline-block;padding:2px 8px;border-radius:4px;background:#e9ecef;color:#212529;font-size:0.82rem;border:1px solid #ced4da;">${recvDateStr}</span>` : '<span style="color:#6c757d;font-size:0.85rem;">Not received</span>'}</td>
                     <td>${recvByCell}</td>
                     <td>${statusCell}</td>
@@ -1191,7 +1191,7 @@ $verifier_name = 'Marilou L. Suarez';
                         <h4>Supplier Information</h4>
                         <p><strong>Supplier:</strong> ${po.supplier_name}</p>
                         <p><strong>Address:</strong> ${po.supplier_address || 'N/A'}</p>
-                        <p><strong>Total Amount:</strong> ₱${parseFloat(po.total_amount).toFixed(2)}</p>
+                        <p><strong>Total Amount:</strong> ₱${parseFloat(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         <p><strong>Created By:</strong> ${po.created_by_name || 'Unknown'}</p>
                     </div>
                 </div>
@@ -1215,7 +1215,7 @@ $verifier_name = 'Marilou L. Suarez';
                         ${itemsHtml}
                         <tr style="background-color: var(--primary-green); color: white; font-weight: bold;">
                             <td colspan="5" style="text-align: right;">GRAND TOTAL:</td>
-                            <td>₱${grandTotal.toFixed(2)}</td>
+                            <td>₱${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -1382,7 +1382,10 @@ $verifier_name = 'Marilou L. Suarez';
             '"': '&quot;',
             "'": '&#039;'
         } [m]));
-        const peso = (n) => '₱' + parseFloat(n || 0).toFixed(2);
+        const peso = (n) => '₱' + parseFloat(String(n || 0).replace(/,/g, '') || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
 
         // Fill Received from / Date fields
         document.getElementById('rrSupplier').textContent = po.supplier_name || '';
