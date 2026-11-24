@@ -502,6 +502,8 @@ if (isset($_SESSION['error'])) {
         margin-bottom: 14px;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        background: #fafafa;
+        border-bottom: 2px solid #073b1d;
     }
 
     /* Letterhead: logo pinned to the first position (left) with its
@@ -514,7 +516,7 @@ if (isset($_SESSION['error'])) {
         align-items: start;
         text-align: center;
         gap: 8px;
-        padding: 0 15px;
+        padding: 15px 0;
     }
 
     .print-letterhead .pl-logo-block {
@@ -523,13 +525,17 @@ if (isset($_SESSION['error'])) {
     }
 
     .print-letterhead .pl-logo {
-        width: 78px;
-        height: 78px;
+        width: 88px;
+        height: 88px;
         object-fit: contain;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 4px;
+        background: #fff;
     }
 
     .print-letterhead .pl-accredited {
-        font-size: 7.5px;
+        font-size: 8px;
         font-weight: 700;
         color: #073b1d;
         letter-spacing: 0.3px;
@@ -542,15 +548,15 @@ if (isset($_SESSION['error'])) {
         grid-column: 3;
         justify-self: end;
         align-self: start;
-        width: 120px;
-        min-height: 64px;
+        width: 130px;
+        min-height: 68px;
         border: 1.5px solid #073b1d;
-        border-radius: 4px;
+        border-radius: 6px;
         background: #fff;
         color: #073b1d;
-        padding: 6px 5px;
-        font-size: 8px;
-        line-height: 1.5;
+        padding: 8px 10px;
+        font-size: 8.5px;
+        line-height: 1.6;
         text-align: center;
         display: flex;
         flex-direction: column;
@@ -569,16 +575,17 @@ if (isset($_SESSION['error'])) {
     }
 
     .print-letterhead .pl-school {
-        font-family: Arial, sans-serif;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         font-weight: bold;
-        font-size: 22px;
+        font-size: 24px;
         line-height: 1.15;
         color: #073b1d;
         letter-spacing: 0.5px;
+        margin-bottom: 4px;
     }
 
     .print-letterhead .pl-role {
-        font-size: 12.5px;
+        font-size: 13px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 2px;
@@ -587,28 +594,29 @@ if (isset($_SESSION['error'])) {
     }
 
     .print-letterhead .pl-address {
-        font-size: 11px;
+        font-size: 12px;
         color: #333;
-        margin: 4px 0 0 0;
+        margin: 6px 0 0 0;
     }
 
     .print-letterhead .pl-contacts {
-        font-size: 10px;
+        font-size: 11px;
         color: #555;
-        margin-top: 1px;
+        margin-top: 2px;
     }
 
     .print-letterhead .pl-banner {
         display: flex;
         justify-content: center;
-        gap: 28px;
+        gap: 32px;
         background: #073b1d;
         color: #ffffff;
-        padding: 4px 10px;
-        font-size: 9px;
-        border-radius: 3px;
-        margin-top: 10px;
+        padding: 6px 14px;
+        font-size: 10px;
+        border-radius: 5px;
+        margin-top: 14px;
         text-align: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
 
     /* Print Styles */
@@ -619,8 +627,8 @@ if (isset($_SESSION['error'])) {
         }
 
         body {
-            font-family: Arial, sans-serif !important;
-            font-size: 12px !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+            font-size: 11px !important;
             color: black !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -644,6 +652,7 @@ if (isset($_SESSION['error'])) {
             box-shadow: none !important;
             margin: 0 !important;
             background: white !important;
+            border: 1px solid #e0e0e0 !important;
         }
 
         .form-content {
@@ -651,7 +660,7 @@ if (isset($_SESSION['error'])) {
         }
 
         .print-container {
-            display: block !important;
+            display: none !important;
             width: 100% !important;
             margin: 0 auto !important;
         }
@@ -662,11 +671,14 @@ if (isset($_SESSION['error'])) {
             text-transform: uppercase !important;
             font-size: 14px !important;
             font-weight: bold !important;
+            color: #073b1d !important;
+            border-bottom: 2px solid #073b1d !important;
+            padding-bottom: 8px !important;
         }
 
         .print-info {
             margin-bottom: 10px !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
         }
 
         .print-info p {
@@ -676,51 +688,59 @@ if (isset($_SESSION['error'])) {
         .print-table {
             border-collapse: collapse !important;
             width: 100% !important;
-            margin-bottom: 20px !important;
-            font-size: 12px !important;
+            margin-bottom: 15px !important;
+            font-size: 11px !important;
         }
 
         .print-table th,
         .print-table td {
-            border: 1px solid black !important;
-            padding: 5px !important;
+            border: 1px solid #dee2e6 !important;
+            padding: 6px !important;
             text-align: center !important;
         }
 
         .print-table th {
-            background: #f2f2f2 !important;
-            font-weight: bold !important;
+            background: #f8f9fa !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            font-size: 11px !important;
+            padding: 8px !important;
+            color: #073b1d !important;
         }
 
         .print-signatures {
             margin-top: 20px !important;
-            font-size: 12px !important;
+            font-size: 11px !important;
         }
 
         .print-sign-section {
-            margin-bottom: 30px !important;
+            margin-bottom: 25px !important;
+            page-break-inside: avoid !important;
         }
 
         .print-sign-name {
             text-transform: uppercase !important;
-            font-weight: bold !important;
+            font-weight: 600 !important;
             text-decoration: underline !important;
             display: block !important;
-            margin-top: 40px !important;
+            margin-top: 30px !important;
+            font-size: 11px !important;
         }
 
         .print-role {
             display: block !important;
             margin-top: -2px !important;
+            font-size: 10px !important;
+            color: #666 !important;
         }
 
         .print-received {
-            margin-top: 40px !important;
+            margin-top: 35px !important;
         }
 
         .print-line {
-            margin-top: 40px !important;
-            border-top: 1px solid black !important;
+            margin-top: 35px !important;
+            border-top: 1px solid #000 !important;
             width: 200px !important;
         }
 
@@ -729,6 +749,11 @@ if (isset($_SESSION['error'])) {
         .items-section,
         .signatures-section {
             display: none !important;
+        }
+
+        /* Ensure print container is always visible during print */
+        .print-letterhead {
+            margin-bottom: 12px !important;
         }
     }
 
@@ -1084,8 +1109,6 @@ if (isset($_SESSION['error'])) {
 </div>
 
 <script>
-    let rowCount = 1;
-
     let rowCount = 1;
 
     // Role-aware item list (property / supply / both) from the server
